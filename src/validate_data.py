@@ -36,12 +36,10 @@ import pandas as pd
 # paths
 #=========================================================
 
-project_root = Path(__file__).resolve().parents[1]
-
-raw_dir = project_root / "data" / "raw"
-output_dir = project_root / "data" / "outputs"
-
-validation_report_path = output_dir / "validation_report.csv"
+validation_report_path = (
+    OUTPUT_DIR
+    / "validation_report.csv"
+)
 
 
 #=========================================================
@@ -49,7 +47,7 @@ validation_report_path = output_dir / "validation_report.csv"
 #=========================================================
 
 dataset_rules: dict[str, dict[str, Any]] = {
-    "data_dates.csv": {
+    DATASETS["dates"]: {
         "required_columns": [
             "date_day",
         ],
@@ -57,7 +55,7 @@ dataset_rules: dict[str, dict[str, Any]] = {
             "date_day",
         ],
     },
-    "data_media_inputs.csv": {
+    DATASETS["media"]: {
         "required_columns": [
             "date_day",
         ],
@@ -65,22 +63,7 @@ dataset_rules: dict[str, dict[str, Any]] = {
             "date_day",
         ],
     },
-    "data_digital_platforms.csv": {
-        "required_columns": [
-            "date_day",
-            "platform",
-            "channel",
-            "metric",
-            "value",
-        ],
-        "grain": [
-            "date_day",
-            "platform",
-            "channel",
-            "metric",
-        ],
-    },
-    "data_attribution.csv": {
+    DATASETS["digital"]: {
         "required_columns": [
             "date_day",
             "platform",
@@ -95,7 +78,22 @@ dataset_rules: dict[str, dict[str, Any]] = {
             "metric",
         ],
     },
-    "data_external.csv": {
+    DATASETS["attribution"]: {
+        "required_columns": [
+            "date_day",
+            "platform",
+            "channel",
+            "metric",
+            "value",
+        ],
+        "grain": [
+            "date_day",
+            "platform",
+            "channel",
+            "metric",
+        ],
+    },
+    DATASETS["external"]: {
         "required_columns": [
             "date_day",
         ],
@@ -103,7 +101,7 @@ dataset_rules: dict[str, dict[str, Any]] = {
             "date_day",
         ],
     },
-    "data_funnel_uncohorted.csv": {
+    DATASETS["funnel_uncohorted"]: {
         "required_columns": [
             "date_day",
         ],
@@ -111,7 +109,7 @@ dataset_rules: dict[str, dict[str, Any]] = {
             "date_day",
         ],
     },
-    "data_funnel_cohorted.csv": {
+    DATASETS["funnel_cohorted"]: {
         "required_columns": [
             "date_day",
         ],
@@ -493,7 +491,7 @@ def validate_dataset(
 
 
 def validate_raw_folder(
-    raw_folder: Path | str = raw_dir,
+    raw_folder: Path | str = RAW_DIR,
     report_path: Path | str = validation_report_path,
 ) -> pd.DataFrame:
     """Validate every configured raw dataset and save one report."""
