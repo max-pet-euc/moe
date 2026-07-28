@@ -59,7 +59,9 @@ dataset_rules: dict[str, dict[str, Any]] = {
         "grain": [
             "date_day",
         ],
+        "allow_future_dates": True,
     },
+    
     DATASETS["media"]: {
         "required_columns": [
             "date_day",
@@ -67,6 +69,7 @@ dataset_rules: dict[str, dict[str, Any]] = {
         "grain": [
             "date_day",
         ],
+        "allow_future_dates": True,
     },
     DATASETS["digital"]: {
         "required_columns": [
@@ -234,6 +237,7 @@ def _validate_dates(
     df: pd.DataFrame,
     dataset: str,
     results: list[dict[str, Any]],
+    allow_future_dates: bool = False,
 ) -> pd.DataFrame:
     """Parse date_day and report invalid or future dates."""
 
@@ -477,6 +481,10 @@ def validate_dataset(
             df=df,
             dataset=file_path.name,
             results=results,
+            allow_future_dates=rules.get(
+                "allow_future_dates",
+                False,
+            ),
         )
 
     _validate_grain(
