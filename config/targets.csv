@@ -1,0 +1,4 @@
+target,column_name,enabled,model_type
+qs,qs,1,forecasting
+cp,cp,1,forecasting
+revenue,revenue,1,forecasting

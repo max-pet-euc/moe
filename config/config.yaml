@@ -1,0 +1,38 @@
+project:
+  name: moe
+  environment: test
+
+data:
+  date_column: date_day
+  raw_path: data/raw
+  engineered_path: data/engineered
+  modelling_path: data/modelling
+  outputs_path: data/outputs
+
+model:
+  target: cp
+  model_type: xgboost
+  train_days: 730
+  test_days: 90
+
+features:
+  calendar: true
+  trend: true
+  adstock: true
+  lags: true
+  rolling: true
+  interactions: false
+
+adstock:
+  default_decay: 0.5
+
+lags:
+  days:
+    - 1
+    - 7
+    - 14
+
+rolling:
+  windows:
+    - 7
+    - 28

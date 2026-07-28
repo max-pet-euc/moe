@@ -1,0 +1,5 @@
+channel,column_name,enabled,adstock_decay
+meta,meta_spend,1,0.5
+google,gads_spend,1,0.5
+tiktok,tiktok_spend,1,0.5
+offline,offline_spend,1,0.5
