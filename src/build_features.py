@@ -182,7 +182,10 @@ def pivot_metric_table(
     )
 
     output["value"] = pd.to_numeric(
-        output["value"],
+        output["value"]
+        .astype(str)
+        .str.replace(",", "", regex=False)
+        .str.strip(),
         errors="raise",
     )
 
