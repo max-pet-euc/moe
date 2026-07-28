@@ -28,7 +28,7 @@ FILE_ALIASES = {
     "funnel_uncohorted": ["data_funnel_uncohorted.csv"],
     "funnel_cohorted": ["data_funnel_cohorted.csv"],
     "media_inputs": ["data_media_inputs.csv", "media_inputs.csv", "media_input.csv"],
-    "marketing_responses": ["data_marketing_responses.csv", "marketing_responses.csv", "marketing_response.csv"],
+    "digital_platforms": ["data_digital_platforms.csv", "digital_platforms.csv",],
     "attribution": ["data_attribution.csv", "attribution.csv"],
     "external": ["data_external.csv", "external.csv"],
 }
