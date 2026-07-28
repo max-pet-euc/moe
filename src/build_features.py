@@ -344,7 +344,7 @@ def build_features(
     #=====================================================
 
     wide_prefixes = {
-        "media_inputs": "",
+        "media": "",
         "external": "external",
         "funnel_uncohorted": "uncohorted",
         "funnel_cohorted": "cohorted",
