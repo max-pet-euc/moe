@@ -1,4 +1,18 @@
-"""Build the canonical daily MOE feature dataset."""
+"""
+Build the canonical daily MOE feature dataset.
+
+Launched by:
+    notebooks/01_feature_builder.ipynb
+
+Purpose:
+    - Load validated raw datasets
+    - Reshape and merge all datasets to a daily grain
+    - Generate engineered features (lags, rolling averages, transforms, etc.)
+    - Save data/engineered/data_features.csv
+
+Output:
+    data/engineered/data_features.csv
+"""
 
 from __future__ import annotations
 
