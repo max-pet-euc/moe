@@ -271,7 +271,16 @@ def _validate_dates(
     today = pd.Timestamp.now().normalize()
     future_date_count = int((parsed_dates > today).sum())
 
-    if future_date_count == 0:
+    if allow_future_dates:
+        _add_result(
+            results=results,
+            dataset=dataset,
+            check="future_dates",
+            status="pass",
+            details="future dates allowed for this dataset",
+        )
+    
+    elif future_date_count == 0:
         _add_result(
             results=results,
             dataset=dataset,
@@ -279,6 +288,7 @@ def _validate_dates(
             status="pass",
             details="no future dates found",
         )
+    
     else:
         _add_result(
             results=results,
