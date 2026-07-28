@@ -1,0 +1,11 @@
+name,display_name,order,enabled
+us,Sessions,0,1
+qs,Quiz Started,1,1
+qc,Quiz Completed,2,1
+qe,Quiz Eligible,3,1
+cp,Consult Paid,4,1
+ca,Consult Approved,5,1
+cc,Consult Completed,6,1
+da,Doctor Approved,7,1
+op,Orders Paid,8,1
+rv,Revenue,9,1
