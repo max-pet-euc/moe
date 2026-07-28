@@ -1,0 +1,10 @@
+dataset,layer,grain,anchor,description,enabled
+data_dates,raw,day,date_day,Calendar dimension and seasonality features,1
+data_funnel_uncohorted,raw,day,event_date,Daily funnel metrics by event date,1
+data_funnel_cohorted,raw,day,qs_date,Daily funnel metrics attributed to QS cohort date,1
+data_media_inputs,raw,day,date_day,Daily marketing spend and media inputs,1
+data_marketing_response,raw,day,date_day,Daily engagement and response metrics,1
+data_attribution,raw,day,date_day,Channel attribution metrics,1
+data_business,raw,day,date_day,Business KPIs and operational inputs,1
+data_external,raw,day,date_day,External factors such as weather and holidays,1
+data_features,engineered,day,date_day,Master engineered feature dataset used for modelling,1
