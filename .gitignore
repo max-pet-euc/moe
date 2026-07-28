@@ -1,0 +1,32 @@
+# python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# virtual environment
+.venv/
+venv/
+
+# mac files
+.DS_Store
+
+# editor settings
+.vscode/
+.idea/
+
+# test/cache files
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# generated data
+data/engineered/*
+!data/engineered/.gitkeep
+
+data/modelling/*
+!data/modelling/.gitkeep
+
+data/outputs/*
+!data/outputs/.gitkeep
