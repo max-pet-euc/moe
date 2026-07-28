@@ -1,4 +1,19 @@
-"""Validation utilities for the Marketing Optimisation Engine."""
+"""
+Validate all raw datasets before feature engineering.
+
+Launched by:
+    notebooks/01_feature_builder.ipynb
+
+Purpose:
+    - Check raw datasets for data quality issues
+    - Validate schema, keys and data types
+    - Detect duplicates and missing dates
+    - Produce a validation report
+    - Stop the pipeline if validation fails
+
+Output:
+    data/outputs/validation_report.csv
+"""
 
 from __future__ import annotations
 
