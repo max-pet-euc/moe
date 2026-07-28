@@ -312,13 +312,15 @@ def validate_feature_output(
 #=========================================================
 
 def build_features(
-    input_folder: Path | str = raw_dir,
+    input_folder: Path | str = RAW_DIR,
     output_path: Path | str = feature_output_path,
 ) -> pd.DataFrame:
-    """Build and save the canonical daily MOE feature dataset."""
+
+"""Build and save the canonical daily MOE feature dataset."""
 
     input_folder = Path(input_folder)
     output_path = Path(output_path)
+    
 
     #=====================================================
     # load canonical date table
