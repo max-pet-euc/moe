@@ -55,16 +55,16 @@ feature_output_path = (
 #=========================================================
 
 wide_datasets = {
-    "dates": "data_dates.csv",
-    "media_inputs": "data_media_inputs.csv",
-    "external": "data_external.csv",
-    "funnel_uncohorted": "data_funnel_uncohorted.csv",
-    "funnel_cohorted": "data_funnel_cohorted.csv",
+    "dates": DATASETS["dates"],
+    "media": DATASETS["media"],
+    "external": DATASETS["external"],
+    "funnel_uncohorted": DATASETS["funnel_uncohorted"],
+    "funnel_cohorted": DATASETS["funnel_cohorted"],
 }
 
 long_datasets = {
-    "digital": "data_digital_platforms.csv",
-    "attribution": "data_attribution.csv",
+    "digital": DATASETS["digital"],
+    "attribution": DATASETS["attribution"],
 }
 
 
