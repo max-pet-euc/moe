@@ -1,0 +1,52 @@
+dataset,check,status,affected_rows,details
+data_dates.csv,file_exists,pass,0,file found
+data_dates.csv,read_csv,pass,0,"5,844 rows loaded"
+data_dates.csv,required_columns,pass,0,all required columns found
+data_dates.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_dates.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_dates.csv,future_dates,pass,0,future dates allowed for this dataset
+data_dates.csv,grain,pass,0,unique at grain: date_day
+data_media_inputs.csv,file_exists,pass,0,file found
+data_media_inputs.csv,read_csv,pass,0,"1,461 rows loaded"
+data_media_inputs.csv,required_columns,pass,0,all required columns found
+data_media_inputs.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_media_inputs.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_media_inputs.csv,future_dates,pass,0,future dates allowed for this dataset
+data_media_inputs.csv,grain,pass,0,unique at grain: date_day
+data_digital_platforms.csv,file_exists,pass,0,file found
+data_digital_platforms.csv,read_csv,pass,0,"7,632 rows loaded"
+data_digital_platforms.csv,required_columns,pass,0,all required columns found
+data_digital_platforms.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_digital_platforms.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_digital_platforms.csv,future_dates,pass,0,no future dates found
+data_digital_platforms.csv,grain,pass,0,"unique at grain: date_day, platform, channel, metric"
+data_digital_platforms.csv,numeric_value,pass,0,all non-null value entries are numeric
+data_attribution.csv,file_exists,pass,0,file found
+data_attribution.csv,read_csv,pass,0,"29,480 rows loaded"
+data_attribution.csv,required_columns,pass,0,all required columns found
+data_attribution.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_attribution.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_attribution.csv,future_dates,pass,0,no future dates found
+data_attribution.csv,grain,pass,0,"unique at grain: date_day, platform, channel, metric"
+data_attribution.csv,numeric_value,pass,0,all non-null value entries are numeric
+data_external.csv,file_exists,pass,0,file found
+data_external.csv,read_csv,pass,0,422 rows loaded
+data_external.csv,required_columns,pass,0,all required columns found
+data_external.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_external.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_external.csv,future_dates,pass,0,no future dates found
+data_external.csv,grain,pass,0,unique at grain: date_day
+data_funnel_uncohorted.csv,file_exists,pass,0,file found
+data_funnel_uncohorted.csv,read_csv,pass,0,571 rows loaded
+data_funnel_uncohorted.csv,required_columns,pass,0,all required columns found
+data_funnel_uncohorted.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_funnel_uncohorted.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_funnel_uncohorted.csv,future_dates,pass,0,no future dates found
+data_funnel_uncohorted.csv,grain,pass,0,unique at grain: date_day
+data_funnel_cohorted.csv,file_exists,pass,0,file found
+data_funnel_cohorted.csv,read_csv,pass,0,571 rows loaded
+data_funnel_cohorted.csv,required_columns,pass,0,all required columns found
+data_funnel_cohorted.csv,duplicate_rows,pass,0,no complete duplicate rows found
+data_funnel_cohorted.csv,valid_dates,pass,0,all date_day values parsed successfully
+data_funnel_cohorted.csv,future_dates,pass,0,no future dates found
+data_funnel_cohorted.csv,grain,pass,0,unique at grain: date_day
