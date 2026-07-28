@@ -379,8 +379,15 @@ def _validate_value_column(
     if "value" not in df.columns:
         return
 
+    clean_values = (
+        df["value"]
+        .astype("string")
+        .str.replace(",", "", regex=False)
+        .str.strip()
+    )
+    
     numeric_values = pd.to_numeric(
-        df["value"],
+        clean_values,
         errors="coerce",
     )
 
