@@ -23,11 +23,13 @@ notebooks/          Pipeline entry points
 4. Run `notebooks/02_train_model.ipynb`
 5. Run optimisation and reporting notebooks
 
-## First raw file
+## Raw datasets
 
-```text
-data/raw/data_dates.csv
-```
+data_funnel_uncohorted.csv
+    Daily event counts based on event date.
+
+data_funnel_cohorted.csv
+    Daily funnel counts attributed to the cohort entry date (QS date).
 
 ## Status
 
