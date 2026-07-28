@@ -1,4 +1,4 @@
-date_day,platform,campaign_type,Values,
+date_day,platform,campaign_type,metrics,values
 2025-12-01,google,search_brand,impressions,"35,543.00"
 2025-12-01,google,search_brand,clicks,"2,877.00"
 2025-12-01,google,search_brand,qs,471.65
