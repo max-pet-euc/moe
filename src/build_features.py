@@ -28,25 +28,26 @@ Output:
 # imports
 #=========================================================
 
-from __future__ import annotations
-
 import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from config.datasets import DATASETS
+from config.settings import (
+    ENGINEERED_DIR,
+    RAW_DIR,
+)
 
 #=========================================================
 # paths
 #=========================================================
 
-project_root = Path(__file__).resolve().parents[1]
-
-raw_dir = project_root / "data" / "raw"
-engineered_dir = project_root / "data" / "engineered"
-
-feature_output_path = engineered_dir / "data_features.csv"
+feature_output_path = (
+    ENGINEERED_DIR
+    / "data_features.csv"
+)
 
 
 #=========================================================
