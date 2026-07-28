@@ -13,7 +13,22 @@ The notebook:
 
 Expected structures:
 
-- Media inputs: `date_day,channel,spend,impressions,clicks`
-- Digital platforms: `date_day,metric,value`
-- External: `date_day,metric,value`
-- Attribution: either channel-wide or metric/value format
+data_media_inputs.csv
+grain: one row per date_day
+format: wide spend columns
+
+data_digital_platforms.csv
+grain: date_day × platform × channel × metric
+columns: date_day, platform, channel, metric, value
+
+data_attribution.csv
+grain: date_day × platform × channel × metric
+columns: date_day, platform, channel, metric, value
+
+data_external.csv
+grain: one row per date_day
+format: wide external metrics
+
+
+
+
