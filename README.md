@@ -14,6 +14,6 @@ The notebook:
 Expected structures:
 
 - Media inputs: `date_day,channel,spend,impressions,clicks`
-- Marketing responses: `date_day,metric,value`
+- Digital platforms: `date_day,metric,value`
 - External: `date_day,metric,value`
 - Attribution: either channel-wide or metric/value format
