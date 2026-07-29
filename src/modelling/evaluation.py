@@ -2,8 +2,10 @@
 Evaluate trained models.
 """
 
-import pandas as pd
+from dataclasses import dataclass
 
+import numpy as np
+import pandas as pd
 from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
@@ -11,45 +13,65 @@ from sklearn.metrics import (
 )
 
 
+@dataclass
+class EvaluationResult:
+    metrics: pd.DataFrame
+    predictions: dict[str, np.ndarray]
+
+
 def evaluate_models(
-    trained_models,
-    x_test,
-    y_test,
-):
+    trained_models: dict,
+    x_test: pd.DataFrame,
+    y_test: pd.Series,
+) -> EvaluationResult:
 
     results = []
+    predictions = {}
 
     for model_name, model in trained_models.items():
 
-        predictions = model.predict(x_test)
-
-        results.append({
-
-            "model": model_name,
-
-            "r2": r2_score(
-                y_test,
-                predictions,
-            ),
-
-            "rmse": (
-                mean_squared_error(
-                    y_test,
-                    predictions,
-                ) ** 0.5
-            ),
-
-            "mae": mean_absolute_error(
-                y_test,
-                predictions,
-            ),
-
-        })
-
-    return (
-        pd.DataFrame(results)
-        .sort_values(
-            "rmse",
+        model_prediction = model.predict(
+            x_test
         )
-        .reset_index(drop=True)
+
+        results.append(
+            {
+                "model": model_name,
+                "mae": mean_absolute_error(
+                    y_test,
+                    model_prediction,
+                ),
+                "rmse": (
+                    mean_squared_error(
+                        y_test,
+                        model_prediction,
+                    )
+                    ** 0.5
+                ),
+                "r2": r2_score(
+                    y_test,
+                    model_prediction,
+                ),
+            }
+        )
+
+        predictions[
+            model_name
+        ] = model_prediction
+
+    metrics = (
+        pd.DataFrame(
+            results
+        )
+        .sort_values(
+            "rmse"
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    return EvaluationResult(
+        metrics=metrics,
+        predictions=predictions,
     )

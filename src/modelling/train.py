@@ -29,6 +29,7 @@ from config.settings import (
 from src.modelling.feature_selection import select_features
 from src.modelling.model_registry import get_models
 from src.modelling.trainer import fit_models
+from src.modelling.evaluation import evaluate_models
 
 #=========================================================
 #==config
@@ -338,48 +339,25 @@ trained_models = fit_models(
     y_train=y_train,
 )
 
-model_results = []
-model_predictions = {}
+#=========================================================
+#==evaluate models
 
-for model_name, model in trained_models.items():
+evaluation_result = evaluate_models(
+    trained_models=trained_models,
+    x_test=x_test,
+    y_test=y_test,
+)
 
-    prediction = model.predict(
-        x_test
-    )
+metrics_df = (
+    evaluation_result.metrics
+)
 
-    metrics = calculate_metrics(
-        actual=y_test,
-        predicted=prediction,
-    )
-
-    model_results.append(
-        {
-            "model": model_name,
-            "mae": metrics["mae"],
-            "rmse": metrics["rmse"],
-            "r2": metrics["r2"],
-            "training_seconds": np.nan,
-        }
-    )
-
-    model_predictions[model_name] = (
-        prediction
-    )
+model_predictions = (
+    evaluation_result.predictions
+)
 
 #=========================================================
 #==model comparison
-
-metrics_df = (
-    pd.DataFrame(
-        model_results
-    )
-    .sort_values(
-        "rmse"
-    )
-    .reset_index(
-        drop=True
-    )
-)
 
 baseline_row = pd.DataFrame(
     [
