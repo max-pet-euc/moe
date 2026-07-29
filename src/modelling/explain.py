@@ -1,6 +1,11 @@
 """
 Explain movement between the latest two modelled periods.
+
+Report contract version 2.0 adds explicit movement, surprise and driver views.
 """
+
+EXPLANATION_VERSION = "2.1-20260729"
+EXPLANATION_FILENAME = "explain_report_v2_20260729.py"
 
 from dataclasses import dataclass
 
@@ -29,9 +34,33 @@ class ExplanationResult:
     actual_vs_expected_movement: float
     prediction_error: float
     movement_scaling_factor: float
+    movement_percentile: float
+    movement_rank: int
+    movement_history_count: int
 
     contribution_df: pd.DataFrame
     summary: str
+
+    @property
+    def movement_accuracy_ratio(self) -> float:
+        """How much of the predicted movement was observed in reality."""
+
+        if self.predicted_change == 0:
+            return np.nan
+
+        return self.actual_change / self.predicted_change
+
+    @property
+    def surprise_direction(self) -> str:
+        """Human-readable direction of the actual-versus-expected residual."""
+
+        if self.actual_vs_expected_movement > 0:
+            return "better_than_expected"
+
+        if self.actual_vs_expected_movement < 0:
+            return "worse_than_expected"
+
+        return "matched_expectation"
 
     @property
     def unexplained_change(self) -> float:
@@ -66,135 +95,111 @@ def build_summary(
         "latest period",
     )
 
-    if actual_change < 0:
-        actual_direction = "fell"
-    elif actual_change > 0:
-        actual_direction = "rose"
-    else:
-        actual_direction = "was unchanged"
+    def movement_text(
+        change: float,
+    ) -> str:
 
-    if predicted_change < 0:
-        predicted_direction = "a fall"
-        contributor_direction = "lowering"
+        if change > 0:
+            return f"rose by {abs(change):,.1f}"
 
-        primary_contributors = (
-            contributions
-            .loc[
-                contributions[
-                    "model_expected_contribution"
-                ] < 0
-            ]
-            .sort_values(
-                "model_expected_contribution",
-                ascending=True,
-            )
-            .head(3)
-        )
+        if change < 0:
+            return f"fell by {abs(change):,.1f}"
 
-    elif predicted_change > 0:
-        predicted_direction = "an increase"
-        contributor_direction = "increasing"
+        return "was unchanged"
 
-        primary_contributors = (
-            contributions
-            .loc[
-                contributions[
-                    "model_expected_contribution"
-                ] > 0
-            ]
-            .sort_values(
-                "model_expected_contribution",
-                ascending=False,
-            )
-            .head(3)
-        )
+    actual_sentence = (
+        f"Actual {stage_label} {movement_text(actual_change)}, "
+        f"from {previous_actual:,.1f} to {current_actual:,.1f}, "
+        f"in the {period_label}."
+    )
 
-    else:
-        predicted_direction = "no change"
-        contributor_direction = "affecting"
-        primary_contributors = contributions.head(0)
-
-    if actual_change == 0:
-        actual_sentence = (
-            f"Actual {stage_label} was unchanged at "
-            f"{current_actual:,.1f} in the {period_label}."
-        )
-    else:
-        actual_sentence = (
-            f"Actual {stage_label} {actual_direction} by "
-            f"{abs(actual_change):,.1f}, from "
-            f"{previous_actual:,.1f} to "
-            f"{current_actual:,.1f}, in the {period_label}."
-        )
-
-    if predicted_change == 0:
-        prediction_sentence = (
-            "The model expected no change, with the prediction "
-            f"remaining at {current_predicted:,.1f}."
-        )
-    else:
-        prediction_sentence = (
-            f"The model expected {predicted_direction} of "
-            f"{abs(predicted_change):,.1f}, from "
-            f"{previous_predicted:,.1f} to "
-            f"{current_predicted:,.1f}."
-        )
-
-    sentences = [
-        actual_sentence,
-        prediction_sentence,
-    ]
-
-    if not primary_contributors.empty:
-
-        contributor_text = ", ".join(
-            (
-                f"{row.feature} "
-                f"({row.model_expected_contribution:+,.1f} model, "
-                f"{row.proportional_actual_contribution:+,.1f} proportional actual)"
-            )
-            for row in primary_contributors.itertuples()
-        )
-
-        sentences.append(
-            (
-                f"The strongest contributors {contributor_direction} "
-                f"the model's expected movement were {contributor_text}."
-            )
-        )
+    prediction_sentence = (
+        f"The model expected {stage_label} to "
+        f"{movement_text(predicted_change)}, from "
+        f"{previous_predicted:,.1f} to {current_predicted:,.1f}."
+    )
 
     if actual_vs_expected_movement > 0:
-        gap_text = "outperformed"
+        surprise_sentence = (
+            f"Actual movement was {abs(actual_vs_expected_movement):,.1f} "
+            "better than expected."
+        )
     elif actual_vs_expected_movement < 0:
-        gap_text = "underperformed"
-    else:
-        gap_text = "matched"
-
-    if actual_vs_expected_movement == 0:
-        sentences.append(
-            "The actual movement matched the model's expectation."
+        surprise_sentence = (
+            f"Actual movement was {abs(actual_vs_expected_movement):,.1f} "
+            "worse than expected."
         )
     else:
-        sentences.append(
-            (
-                f"Actual performance {gap_text} the model's "
-                f"expected movement by "
-                f"{abs(actual_vs_expected_movement):,.1f}."
-            )
+        surprise_sentence = (
+            "Actual movement matched the model's expectation."
         )
 
-    sentences.append(
-        (
-            "Proportional actual contributions scale the model's "
-            "SHAP movement attribution to the observed actual movement; "
-            "they are directional estimates rather than causal measurements."
+    positive_contributors = (
+        contributions
+        .loc[
+            contributions[
+                "model_expected_contribution"
+            ] > 0
+        ]
+        .sort_values(
+            "model_expected_contribution",
+            ascending=False,
         )
+        .head(3)
     )
+
+    negative_contributors = (
+        contributions
+        .loc[
+            contributions[
+                "model_expected_contribution"
+            ] < 0
+        ]
+        .sort_values(
+            "model_expected_contribution",
+            ascending=True,
+        )
+        .head(3)
+    )
+
+    driver_sentences = []
+
+    if not positive_contributors.empty:
+
+        positive_text = ", ".join(
+            (
+                f"{row.feature} "
+                f"({row.model_expected_contribution:+,.1f})"
+            )
+            for row in positive_contributors.itertuples()
+        )
+
+        driver_sentences.append(
+            f"The main upward model drivers were {positive_text}."
+        )
+
+    if not negative_contributors.empty:
+
+        negative_text = ", ".join(
+            (
+                f"{row.feature} "
+                f"({row.model_expected_contribution:+,.1f})"
+            )
+            for row in negative_contributors.itertuples()
+        )
+
+        driver_sentences.append(
+            f"The main downward model drivers were {negative_text}."
+        )
 
     return " ".join(
-        sentences
+        [
+            actual_sentence,
+            prediction_sentence,
+            surprise_sentence,
+            *driver_sentences,
+        ]
     )
-
 
 def explain_latest_change(
     model,
@@ -479,6 +484,46 @@ def explain_latest_change(
         * movement_scaling_factor
     )
 
+    # Compare the current feature values with the reference distribution.
+    # Percentiles are descriptive context only, not causal evidence.
+    current_feature_percentiles = []
+    for feature in feature_data.columns:
+        reference_values = pd.to_numeric(
+            reference_data[feature],
+            errors="coerce",
+        ).dropna()
+        current_value = pd.to_numeric(
+            pd.Series([explain_features.iloc[1][feature]]),
+            errors="coerce",
+        ).iloc[0]
+
+        if reference_values.empty or pd.isna(current_value):
+            current_feature_percentiles.append(np.nan)
+        else:
+            current_feature_percentiles.append(
+                float((reference_values <= current_value).mean() * 100)
+            )
+
+    actual_series = pd.to_numeric(
+        prediction_data[actual_column],
+        errors="coerce",
+    )
+    historical_movements = actual_series.diff().dropna().abs()
+    current_abs_movement = abs(actual_change)
+
+    if historical_movements.empty:
+        movement_percentile = np.nan
+        movement_rank = 1
+        movement_history_count = 0
+    else:
+        movement_percentile = float(
+            (historical_movements <= current_abs_movement).mean() * 100
+        )
+        movement_rank = int(
+            (historical_movements > current_abs_movement).sum() + 1
+        )
+        movement_history_count = int(len(historical_movements))
+
     contributions = pd.DataFrame(
         {
             "feature": feature_data.columns,
@@ -505,6 +550,9 @@ def explain_latest_change(
             ),
             "proportional_actual_contribution": (
                 proportional_actual_contribution
+            ),
+            "current_value_percentile": (
+                current_feature_percentiles
             ),
         }
     )
@@ -591,6 +639,9 @@ def explain_latest_change(
         movement_scaling_factor=(
             movement_scaling_factor
         ),
+        movement_percentile=movement_percentile,
+        movement_rank=movement_rank,
+        movement_history_count=movement_history_count,
         contribution_df=contributions,
         summary=summary,
     )
