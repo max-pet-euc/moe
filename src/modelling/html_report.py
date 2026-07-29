@@ -336,6 +336,7 @@ def get_summary_text(
 
 def build_model_report(
     model_stage: str,
+    model_grain: str,
     target_column: str,
     best_model_name: str,
     comparison_df: pd.DataFrame,
@@ -401,6 +402,7 @@ def build_model_report(
         [
             {
                 "model_stage": model_stage,
+                "model_grain": model_grain,
                 "target_column": target_column,
                 "best_model": best_model_name,
                 "data_rows": len(model_df),
@@ -463,7 +465,7 @@ def build_model_report(
         content="width=device-width, initial-scale=1.0"
     >
     <title>
-        {model_stage.upper()} Model Report
+    {model_stage.upper()} {model_grain.title()} Model Report
     </title>
 
     <style>
@@ -581,7 +583,7 @@ def build_model_report(
 
         <div class="header">
             <h1>
-                {model_stage.upper()} Model Report
+                {model_stage.upper()} {model_grain.title()} Model Report
             </h1>
 
             <p>

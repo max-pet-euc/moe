@@ -31,6 +31,9 @@ from config.settings import (
     REPORT_OUTPUT_DIR,
     STAGE_ALIASES,
     TEST_DAYS,
+    MODEL_GRAIN,
+    MODEL_GRAIN_COLUMNS,
+    VALID_MODEL_GRAINS,
 )
 
 from src.modelling.feature_selection import select_features
@@ -66,6 +69,19 @@ prediction_output_dir = (
 input_file = (
     ENGINEERED_DIR
     / "data_features.csv"
+)
+
+if MODEL_GRAIN not in VALID_MODEL_GRAINS:
+    raise ValueError(
+        f"invalid model grain: {MODEL_GRAIN}"
+    )
+
+model_grain = MODEL_GRAIN
+
+model_date_column = (
+    MODEL_GRAIN_COLUMNS[
+        model_grain
+    ]
 )
 
 
@@ -394,7 +410,7 @@ prediction_df = pd.DataFrame(
 
 prediction_file = (
     prediction_output_dir
-    / f"{model_stage}_predictions.csv"
+    / f"{model_stage}_{model_grain}_predictions.csv"
 )
 
 save_dataframe(
@@ -441,7 +457,7 @@ importance_df = (
 
 importance_file = (
     model_output_dir
-    / f"{model_stage}_feature_importance.csv"
+    / f"{model_stage}_{model_grain}_feature_importance.csv"
 )
 
 save_dataframe(
@@ -461,7 +477,7 @@ feature_list_df = pd.DataFrame(
 
 feature_list_file = (
     model_output_dir
-    / f"{model_stage}_features.csv"
+    / f"{model_stage}_{model_grain}_features.csv"
 )
 
 save_dataframe(
@@ -475,7 +491,7 @@ save_dataframe(
 
 metrics_file = (
     model_output_dir
-    / f"{model_stage}_model_comparison.csv"
+    / f"{model_stage}_{model_grain}_model_comparison.csv"
 )
 
 save_dataframe(
@@ -489,7 +505,11 @@ save_dataframe(
 
 model_file = (
     model_output_dir
-    / f"{model_stage}_{best_model_name}.joblib"
+    / (
+        f"{model_stage}_"
+        f"{model_grain}_"
+        f"{best_model_name}.joblib"
+    )
 )
 
 save_model(
@@ -575,7 +595,11 @@ print(f"feature list: {feature_list_file}")
 
 report_file = (
     REPORT_OUTPUT_DIR
-    / f"{model_stage}_model_report.html"
+    / (
+        f"{model_stage}_"
+        f"{model_grain}_"
+        f"model_report.html"
+    )
 )
 
 #=========================================================
@@ -583,6 +607,7 @@ report_file = (
 
 report_file = build_model_report(
     model_stage=model_stage,
+    model_grain=model_grain,
     target_column=target_column,
     best_model_name=best_model_name,
     comparison_df=comparison_df,

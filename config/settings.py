@@ -24,6 +24,25 @@ DATA_SOURCE = "csv"
 # DATA_SOURCE = "bigquery"
 
 #=========================================================
+#==granularity
+
+MODEL_GRAIN = "daily"
+# MODEL_GRAIN = "weekly"
+# MODEL_GRAIN = "monthly"
+
+VALID_MODEL_GRAINS = {
+    "daily",
+    "weekly",
+    "monthly",
+}
+
+MODEL_GRAIN_COLUMNS = {
+    "daily": "date_day",
+    "weekly": "date_week",
+    "monthly": "date_month",
+}
+
+#=========================================================
 #==modelling config
 
 MODEL_STAGE = "qs"
