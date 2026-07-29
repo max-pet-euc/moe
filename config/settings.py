@@ -45,7 +45,7 @@ MODEL_GRAIN_COLUMNS = {
 #=========================================================
 #==modelling config
 
-MODEL_STAGE = "qs"
+MODEL_STAGE = "cp"
 
 TEST_DAYS = 90
 
@@ -87,6 +87,14 @@ ALWAYS_EXCLUDED_COLUMNS = {
     "spend_total",
     "spend_media",
     "spend_digital",
+    "uncohorted_us",
+    "uncohorted_qs",
+    "uncohorted_qc",
+    "uncohorted_qe",
+    "cohorted_us",
+    "cohorted_qs",
+    "cohorted_qc",
+    "cohorted_qe",
 }
 
 MODEL_OUTPUT_DIR = (
