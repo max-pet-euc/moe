@@ -28,6 +28,7 @@ from config.settings import (
     MODEL_STAGE,
     MODEL_TARGETS,
     PREDICTION_OUTPUT_DIR,
+    REPORT_OUTPUT_DIR,
     STAGE_ALIASES,
     TEST_DAYS,
 )
@@ -39,6 +40,9 @@ from src.modelling.evaluation import evaluate_models
 from src.modelling.reporting import (
     save_dataframe,
     save_model,
+)
+from src.modelling.html_report import (
+    build_model_report,
 )
 
 #=========================================================
@@ -564,3 +568,48 @@ print(
     f"{importance_file}"
 )
 print(f"feature list: {feature_list_file}")
+
+
+#=========================================================
+#==html output
+
+report_file = (
+    REPORT_OUTPUT_DIR
+    / f"{model_stage}_model_report.html"
+)
+
+#=========================================================
+#==build html report
+
+report_file = build_model_report(
+    model_stage=model_stage,
+    target_column=target_column,
+    best_model_name=best_model_name,
+    comparison_df=comparison_df,
+    prediction_df=prediction_df,
+    importance_df=importance_df,
+    model_df=model_df,
+    feature_columns=feature_columns,
+    excluded_leakage_columns=(
+        excluded_leakage_columns
+    ),
+    train_rows=len(
+        x_train
+    ),
+    test_rows=len(
+        x_test
+    ),
+    test_start_date=test_start_date,
+    output_paths={
+        "model": model_file,
+        "metrics": metrics_file,
+        "predictions": prediction_file,
+        "feature_importance": (
+            importance_file
+        ),
+        "feature_list": feature_list_file,
+    },
+    output_path=report_file,
+)
+
+print(f"html report: {report_file}")

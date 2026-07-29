@@ -80,3 +80,7 @@ PREDICTION_OUTPUT_DIR = (
     / "predictions"
 )
 
+REPORT_OUTPUT_DIR = (
+    OUTPUT_DIR
+    / "reports"
+)
