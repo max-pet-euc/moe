@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from src.modelling.explain import (
+    ExplanationResult,
+)
+
 
 def ensure_directory(
     path,
@@ -333,24 +337,76 @@ def get_summary_text(
         f"{baseline_text}"
     )
 
+def build_contribution_chart(
+    explanation_result: ExplanationResult,
+    top_n: int = 15,
+) -> str:
+
+    chart_df = (
+        explanation_result
+        .contributions
+        .head(
+            top_n
+        )
+        .sort_values(
+            "contribution",
+            ascending=True,
+        )
+    )
+
+    figure, axis = plt.subplots(
+        figsize=(10, 7)
+    )
+
+    axis.barh(
+        chart_df["feature"],
+        chart_df["contribution"],
+    )
+
+    axis.axvline(
+        0,
+        linewidth=1,
+    )
+
+    axis.set_title(
+        "Drivers of predicted change"
+    )
+
+    axis.set_xlabel(
+        "Contribution to predicted change"
+    )
+
+    axis.set_ylabel(
+        "Feature"
+    )
+
+    axis.grid(
+        axis="x",
+        alpha=0.25,
+    )
+
+    return figure_to_base64(
+        figure
+    )
 
 def build_model_report(
-    model_stage: str,
-    model_grain: str,
-    target_column: str,
-    best_model_name: str,
-    comparison_df: pd.DataFrame,
-    prediction_df: pd.DataFrame,
-    importance_df: pd.DataFrame,
-    model_df: pd.DataFrame,
-    feature_columns: list[str],
-    excluded_leakage_columns: list[str],
-    train_rows: int,
-    test_rows: int,
-    test_start_date,
-    output_paths: dict[str, Path],
-    output_path,
-) -> Path:
+        model_stage: str,
+        model_grain: str,
+        target_column: str,
+        best_model_name: str,
+        comparison_df: pd.DataFrame,
+        prediction_df: pd.DataFrame,
+        importance_df: pd.DataFrame,
+        model_df: pd.DataFrame,
+        feature_columns: list[str],
+        excluded_leakage_columns: list[str],
+        train_rows: int,
+        test_rows: int,
+        test_start_date,
+        output_paths: dict[str, Path],
+        explanation_result: ExplanationResult,
+        output_path,
+    ) -> Path:
 
     output_path = Path(
         output_path
@@ -392,10 +448,58 @@ def build_model_report(
         )
     )
 
+    contribution_image = (
+        build_contribution_chart(
+            explanation_result=explanation_result,
+            top_n=15,
+        )
+    )
+
     summary_text = get_summary_text(
         comparison_df=comparison_df,
         best_model_name=best_model_name,
         model_stage=model_stage,
+    )
+
+    explanation_summary_df = pd.DataFrame(
+        [
+            {
+                "previous_period": (
+                    explanation_result
+                    .previous_date
+                    .date()
+                ),
+                "current_period": (
+                    explanation_result
+                    .current_date
+                    .date()
+                ),
+                "previous_actual": (
+                    explanation_result
+                    .previous_actual
+                ),
+                "current_actual": (
+                    explanation_result
+                    .current_actual
+                ),
+                "actual_change": (
+                    explanation_result
+                    .actual_change
+                ),
+                "actual_change_pct": (
+                    explanation_result
+                    .actual_change_pct
+                ),
+                "predicted_change": (
+                    explanation_result
+                    .predicted_change
+                ),
+                "unexplained_change": (
+                    explanation_result
+                    .unexplained_change
+                ),
+            }
+        ]
     )
 
     model_config_df = pd.DataFrame(
@@ -599,6 +703,53 @@ def build_model_report(
             <p class="summary">
                 {summary_text}
             </p>
+        </div>
+
+        <div class="card">
+            <h2>
+                Explain latest change
+            </h2>
+
+            <p class="summary">
+                {explanation_result.summary}
+            </p>
+
+            <div class="table-wrapper">
+                {
+                    dataframe_to_html(
+                        explanation_summary_df,
+                        decimals=2,
+                    )
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>
+                Drivers of predicted change
+            </h2>
+
+            <img
+                class="chart"
+                src="data:image/png;base64,{contribution_image}"
+                alt="Drivers of predicted change"
+            >
+
+            <div class="table-wrapper">
+                {
+                    dataframe_to_html(
+                        explanation_result
+                        .contributions
+                        .drop(
+                            columns=[
+                                "absolute_contribution",
+                            ]
+                        ),
+                        decimals=3,
+                        max_rows=20,
+                    )
+                }
+            </div>
         </div>
 
         <div class="card">

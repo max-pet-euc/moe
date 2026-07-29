@@ -47,6 +47,9 @@ from src.modelling.reporting import (
 from src.modelling.html_report import (
     build_model_report,
 )
+from src.modelling.explain import (
+    explain_latest_change,
+)
 
 #=========================================================
 #==config
@@ -603,38 +606,53 @@ report_file = (
 )
 
 #=========================================================
+#==explain latest change
+
+explanation_result = (
+    explain_latest_change(
+        model=best_model,
+        x_reference=x_train,
+        x_explain=x_test,
+        prediction_df=prediction_df,
+        model_stage=model_stage,
+        model_grain=model_grain,
+        date_column="date_day",
+    )
+)
+#=========================================================
 #==build html report
 
 report_file = build_model_report(
-    model_stage=model_stage,
-    model_grain=model_grain,
-    target_column=target_column,
-    best_model_name=best_model_name,
-    comparison_df=comparison_df,
-    prediction_df=prediction_df,
-    importance_df=importance_df,
-    model_df=model_df,
-    feature_columns=feature_columns,
-    excluded_leakage_columns=(
-        excluded_leakage_columns
-    ),
-    train_rows=len(
-        x_train
-    ),
-    test_rows=len(
-        x_test
-    ),
-    test_start_date=test_start_date,
-    output_paths={
-        "model": model_file,
-        "metrics": metrics_file,
-        "predictions": prediction_file,
-        "feature_importance": (
-            importance_file
+        model_stage=model_stage,
+        model_grain=model_grain,
+        target_column=target_column,
+        best_model_name=best_model_name,
+        comparison_df=comparison_df,
+        prediction_df=prediction_df,
+        importance_df=importance_df,
+        model_df=model_df,
+        feature_columns=feature_columns,
+        excluded_leakage_columns=(
+            excluded_leakage_columns
         ),
-        "feature_list": feature_list_file,
-    },
-    output_path=report_file,
-)
+        train_rows=len(
+            x_train
+        ),
+        test_rows=len(
+            x_test
+        ),
+        test_start_date=test_start_date,
+        output_paths={
+            "model": model_file,
+            "metrics": metrics_file,
+            "predictions": prediction_file,
+            "feature_importance": (
+                importance_file
+            ),
+            "feature_list": feature_list_file,
+        },
+        explanation_result=explanation_result,
+        output_path=report_file,
+    )
 
 print(f"html report: {report_file}")
