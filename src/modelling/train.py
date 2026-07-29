@@ -21,8 +21,15 @@ from sklearn.metrics import (
 )
 
 from config.settings import (
+    ALWAYS_EXCLUDED_COLUMNS,
     ENGINEERED_DIR,
-    OUTPUT_DIR,
+    FUNNEL_ORDER,
+    MODEL_OUTPUT_DIR,
+    MODEL_STAGE,
+    MODEL_TARGETS,
+    PREDICTION_OUTPUT_DIR,
+    STAGE_ALIASES,
+    TEST_DAYS,
 )
 
 from src.modelling.feature_selection import select_features
@@ -37,60 +44,24 @@ from src.modelling.reporting import (
 #=========================================================
 #==config
 
-model_stage = "qs"
-# model_stage = "cp"
-# model_stage = "rv"
+model_stage = MODEL_STAGE
+test_days = TEST_DAYS
 
-test_days = 90
-
-funnel_order = [
-    "us",
-    "qs",
-    "qc",
-    "qe",
-    "cp",
-    "op",
-    "rv",
-]
-
-model_targets = {
-    "qs": "uncohorted_qs",
-    "cp": "uncohorted_cp",
-    "rv": "uncohorted_rv",
-}
-
-stage_aliases = {
-    "us": ["us"],
-    "qs": ["qs"],
-    "qc": ["qc"],
-    "qe": ["qe"],
-    "cp": ["cp"],
-    "op": ["op"],
-    "rv": ["rv", "revenue"],
-}
-
-always_excluded_columns = {
-    "date_day",
-    "date_week",
-    "date_month",
-    "spend_total",
-    "spend_media",
-    "spend_digital",
-}
-
-input_file = ENGINEERED_DIR / "data_features.csv"
-
-model_output_dir = OUTPUT_DIR / "models"
-prediction_output_dir = OUTPUT_DIR / "predictions"
-
-model_output_dir.mkdir(
-    parents=True,
-    exist_ok=True,
+funnel_order = FUNNEL_ORDER
+model_targets = MODEL_TARGETS
+stage_aliases = STAGE_ALIASES
+always_excluded_columns = (
+    ALWAYS_EXCLUDED_COLUMNS
 )
 
-prediction_output_dir.mkdir(
-    parents=True,
-    exist_ok=True,
+model_output_dir = MODEL_OUTPUT_DIR
+prediction_output_dir = (
+    PREDICTION_OUTPUT_DIR
+)
+
+input_file = (
+    ENGINEERED_DIR
+    / "data_features.csv"
 )
 
 

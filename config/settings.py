@@ -23,19 +23,14 @@ OUTPUT_DIR = DATA_DIR / "outputs"
 DATA_SOURCE = "csv"
 # DATA_SOURCE = "bigquery"
 
+#=========================================================
+#==modelling config
 
-# ==========================================================
-# Modelling
-
-DATE_COLUMN = "date_day"
-
-RANDOM_STATE = 42
+MODEL_STAGE = "qs"
 
 TEST_DAYS = 90
 
-
-# ==========================================================
-# Funnel
+RANDOM_STATE = 42
 
 FUNNEL_ORDER = [
     "us",
@@ -53,10 +48,35 @@ MODEL_TARGETS = {
     "rv": "uncohorted_rv",
 }
 
-
-# ==========================================================
-# Always excluded features
+STAGE_ALIASES = {
+    "us": ["us"],
+    "qs": ["qs"],
+    "qc": ["qc"],
+    "qe": ["qe"],
+    "cp": ["cp"],
+    "op": ["op"],
+    "rv": [
+        "rv",
+        "revenue",
+    ],
+}
 
 ALWAYS_EXCLUDED_COLUMNS = {
-    DATE_COLUMN,
+    "date_day",
+    "date_week",
+    "date_month",
+    "spend_total",
+    "spend_media",
+    "spend_digital",
 }
+
+MODEL_OUTPUT_DIR = (
+    OUTPUT_DIR
+    / "models"
+)
+
+PREDICTION_OUTPUT_DIR = (
+    OUTPUT_DIR
+    / "predictions"
+)
+
