@@ -1,4 +1,4 @@
-from time import perf_counter
+
 import re
 
 import joblib
@@ -26,8 +26,9 @@ from config.settings import (
     OUTPUT_DIR,
 )
 
+from src.modelling.feature_selection import select_features
 from src.modelling.model_registry import get_models
-
+from src.modelling.trainer import fit_models
 
 #=========================================================
 #==config
@@ -252,64 +253,21 @@ if model_df.empty:
 #=========================================================
 #==select features
 
-candidate_columns = [
-    column
-    for column in model_df.columns
-    if column not in always_excluded_columns
-    and column != target_column
-    and not contains_stage_marker(
-        column=column,
-        stages=leakage_stages,
-    )
-]
-
-numeric_feature_data = {}
-
-for column in candidate_columns:
-
-    cleaned_column = clean_numeric_series(
-        model_df[column]
-    )
-
-    if cleaned_column.notna().any():
-        numeric_feature_data[column] = cleaned_column
-
-feature_columns = list(
-    numeric_feature_data
+selection = select_features(
+    model_df=model_df,
+    model_stage=model_stage,
 )
 
-if not feature_columns:
-    raise ValueError(
-        "no numeric feature columns found"
-    )
+x = selection.x
+y = selection.y
 
-x = pd.DataFrame(
-    numeric_feature_data,
-    index=model_df.index,
+feature_columns = (
+    selection.feature_columns
 )
 
-x = (
-    x
-    .replace(
-        [np.inf, -np.inf],
-        np.nan,
-    )
-    .fillna(0)
+excluded_leakage_columns = (
+    selection.leakage_columns
 )
-
-y = model_df[
-    target_column
-].copy()
-
-excluded_leakage_columns = [
-    column
-    for column in model_df.columns
-    if column != target_column
-    and contains_stage_marker(
-        column=column,
-        stages=leakage_stages,
-    )
-]
 
 
 #=========================================================
@@ -369,32 +327,24 @@ baseline_metrics = calculate_metrics(
     predicted=baseline_prediction,
 )
 
-
 #=========================================================
 #==train models
 
 models = get_models()
 
+trained_models = fit_models(
+    models=models,
+    x_train=x_train,
+    y_train=y_train,
+)
+
 model_results = []
 model_predictions = {}
-trained_models = {}
 
-for model_name, model in models.items():
-
-    start_time = perf_counter()
-
-    model.fit(
-        x_train,
-        y_train,
-    )
+for model_name, model in trained_models.items():
 
     prediction = model.predict(
         x_test
-    )
-
-    training_seconds = (
-        perf_counter()
-        - start_time
     )
 
     metrics = calculate_metrics(
@@ -408,13 +358,13 @@ for model_name, model in models.items():
             "mae": metrics["mae"],
             "rmse": metrics["rmse"],
             "r2": metrics["r2"],
-            "training_seconds": training_seconds,
+            "training_seconds": np.nan,
         }
     )
 
-    model_predictions[model_name] = prediction
-    trained_models[model_name] = model
-
+    model_predictions[model_name] = (
+        prediction
+    )
 
 #=========================================================
 #==model comparison
