@@ -37,13 +37,16 @@ def get_models(random_state: int = 42) -> dict:
         "random_forest": RandomForestRegressor(
             n_estimators=300,
             random_state=random_state,
+            n_jobs=-1,
         ),
 
         "xgboost": XGBRegressor(
             n_estimators=300,
             learning_rate=0.05,
             max_depth=4,
+            objective="reg:squarederror",
             random_state=random_state,
+            n_jobs=-1,
         ),
 
     }

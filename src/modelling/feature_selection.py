@@ -185,6 +185,11 @@ def select_features(
         model_df[target_column]
     )
 
+    valid_target_mask = y.notna()
+
+    x = x.loc[valid_target_mask].copy()
+    y = y.loc[valid_target_mask].copy()
+
     return FeatureSelectionResult(
         x=x,
         y=y,
