@@ -1,9 +1,10 @@
 
 import re
-
-import joblib
 import numpy as np
 import pandas as pd
+
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import (
     HistGradientBoostingRegressor,
     RandomForestRegressor,
@@ -18,8 +19,6 @@ from sklearn.metrics import (
     mean_squared_error,
     r2_score,
 )
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
 from config.settings import (
     ENGINEERED_DIR,
@@ -30,6 +29,10 @@ from src.modelling.feature_selection import select_features
 from src.modelling.model_registry import get_models
 from src.modelling.trainer import fit_models
 from src.modelling.evaluation import evaluate_models
+from src.modelling.reporting import (
+    save_dataframe,
+    save_model,
+)
 
 #=========================================================
 #==config
@@ -402,7 +405,7 @@ best_prediction = model_predictions[
 
 
 #=========================================================
-#==predictions
+#==reporting on predictions
 
 prediction_df = pd.DataFrame(
     {
@@ -419,9 +422,9 @@ prediction_file = (
     / f"{model_stage}_predictions.csv"
 )
 
-prediction_df.to_csv(
-    prediction_file,
-    index=False,
+save_dataframe(
+    dataframe=prediction_df,
+    output_path=prediction_file,
 )
 
 
@@ -466,9 +469,9 @@ importance_file = (
     / f"{model_stage}_feature_importance.csv"
 )
 
-importance_df.to_csv(
-    importance_file,
-    index=False,
+save_dataframe(
+    dataframe=importance_df,
+    output_path=importance_file,
 )
 
 
@@ -486,9 +489,9 @@ feature_list_file = (
     / f"{model_stage}_features.csv"
 )
 
-feature_list_df.to_csv(
-    feature_list_file,
-    index=False,
+save_dataframe(
+    dataframe=feature_list_df,
+    output_path=feature_list_file,
 )
 
 
@@ -500,9 +503,9 @@ metrics_file = (
     / f"{model_stage}_model_comparison.csv"
 )
 
-comparison_df.to_csv(
-    metrics_file,
-    index=False,
+save_dataframe(
+    dataframe=comparison_df,
+    output_path=metrics_file,
 )
 
 
@@ -514,9 +517,9 @@ model_file = (
     / f"{model_stage}_{best_model_name}.joblib"
 )
 
-joblib.dump(
-    best_model,
-    model_file,
+save_model(
+    model=best_model,
+    output_path=model_file,
 )
 
 
