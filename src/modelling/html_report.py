@@ -193,7 +193,7 @@ def build_feature_importance_chart(
         importance_df
         .head(top_n)
         .sort_values(
-            "importance",
+            "relative_importance",
             ascending=True,
         )
     )
@@ -204,7 +204,7 @@ def build_feature_importance_chart(
 
     axis.barh(
         chart_df["feature"],
-        chart_df["importance"],
+        chart_df["relative_importance"],
     )
 
     axis.set_title(
@@ -212,7 +212,7 @@ def build_feature_importance_chart(
     )
 
     axis.set_xlabel(
-        "Permutation importance"
+        "Relative importance index (top feature = 100)"
     )
 
     axis.set_ylabel(
@@ -342,16 +342,41 @@ def build_contribution_chart(
     top_n: int = 15,
 ) -> str:
 
-    chart_df = (
+    contribution_df = (
         explanation_result
-        .contributions
-        .head(
-            top_n
+        .contribution_df
+        .copy()
+    )
+
+    if explanation_result.predicted_change < 0:
+
+        chart_df = (
+            contribution_df
+            .loc[
+                contribution_df["model_expected_contribution"] < 0
+            ]
+            .head(top_n)
+            .copy()
         )
-        .sort_values(
-            "contribution",
-            ascending=True,
+
+        chart_direction = "lowering"
+
+    else:
+
+        chart_df = (
+            contribution_df
+            .loc[
+                contribution_df["model_expected_contribution"] > 0
+            ]
+            .head(top_n)
+            .copy()
         )
+
+        chart_direction = "increasing"
+
+    chart_df = (
+        chart_df
+        .iloc[::-1]
     )
 
     figure, axis = plt.subplots(
@@ -360,7 +385,7 @@ def build_contribution_chart(
 
     axis.barh(
         chart_df["feature"],
-        chart_df["contribution"],
+        chart_df["model_expected_contribution"],
     )
 
     axis.axvline(
@@ -369,11 +394,11 @@ def build_contribution_chart(
     )
 
     axis.set_title(
-        "Drivers of predicted change"
+        f"Main contributors {chart_direction} the expected movement"
     )
 
     axis.set_xlabel(
-        "Contribution to predicted change"
+        "Contribution to expected movement"
     )
 
     axis.set_ylabel(
@@ -441,9 +466,77 @@ def build_model_report(
         )
     )
 
+    report_importance_df = (
+        importance_df
+        .copy()
+    )
+
+    positive_importance = (
+        report_importance_df["importance"]
+        .clip(lower=0)
+    )
+
+    max_importance = float(
+        positive_importance.max()
+    )
+
+    if max_importance > 0:
+
+        report_importance_df[
+            "relative_importance"
+        ] = (
+            positive_importance
+            / max_importance
+            * 100
+        )
+
+    else:
+
+        report_importance_df[
+            "relative_importance"
+        ] = 0.0
+
+    report_importance_df[
+        "importance_variability"
+    ] = (
+        report_importance_df["importance_std"]
+        / report_importance_df["importance"]
+        .abs()
+        .replace(0, np.nan)
+    )
+
+    report_importance_df[
+        "stability"
+    ] = np.select(
+        [
+            report_importance_df[
+                "importance_variability"
+            ] <= 0.15,
+            report_importance_df[
+                "importance_variability"
+            ] <= 0.35,
+        ],
+        [
+            "high",
+            "moderate",
+        ],
+        default="low",
+    )
+
+    report_importance_df = (
+        report_importance_df
+        .sort_values(
+            "relative_importance",
+            ascending=False,
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
     importance_image = (
         build_feature_importance_chart(
-            importance_df=importance_df,
+            importance_df=report_importance_df,
             top_n=20,
         )
     )
@@ -464,39 +557,19 @@ def build_model_report(
     explanation_summary_df = pd.DataFrame(
         [
             {
-                "previous_period": (
-                    explanation_result
-                    .previous_date
-                    .date()
+                "previous_period": explanation_result.previous_period,
+                "current_period": explanation_result.current_period,
+                "previous_actual": explanation_result.previous_actual,
+                "current_actual": explanation_result.current_actual,
+                "actual_change": explanation_result.actual_change,
+                "previous_predicted": explanation_result.previous_predicted,
+                "current_predicted": explanation_result.current_predicted,
+                "predicted_change": explanation_result.predicted_change,
+                "actual_vs_expected_movement": (
+                    explanation_result.actual_vs_expected_movement
                 ),
-                "current_period": (
-                    explanation_result
-                    .current_date
-                    .date()
-                ),
-                "previous_actual": (
-                    explanation_result
-                    .previous_actual
-                ),
-                "current_actual": (
-                    explanation_result
-                    .current_actual
-                ),
-                "actual_change": (
-                    explanation_result
-                    .actual_change
-                ),
-                "actual_change_pct": (
-                    explanation_result
-                    .actual_change_pct
-                ),
-                "predicted_change": (
-                    explanation_result
-                    .predicted_change
-                ),
-                "unexplained_change": (
-                    explanation_result
-                    .unexplained_change
+                "movement_scaling_factor": (
+                    explanation_result.movement_scaling_factor
                 ),
             }
         ]
@@ -543,9 +616,6 @@ def build_model_report(
             ascending=False,
         )
         .head(20)
-        .sort_values(
-            "date_day"
-        )
     )
 
     output_files_df = pd.DataFrame(
@@ -707,7 +777,7 @@ def build_model_report(
 
         <div class="card">
             <h2>
-                Explain latest change
+                Latest movement
             </h2>
 
             <p class="summary">
@@ -726,25 +796,38 @@ def build_model_report(
 
         <div class="card">
             <h2>
-                Drivers of predicted change
+                Main contributors to expected movement
             </h2>
+
+            <p>
+                Model expected contribution is the raw SHAP explanation for
+                the model's predicted movement. Proportional actual
+                contribution scales that attribution to the observed actual
+                movement. The proportional value is a directional estimate,
+                not a causal measurement.
+            </p>
 
             <img
                 class="chart"
                 src="data:image/png;base64,{contribution_image}"
-                alt="Drivers of predicted change"
+                alt="Main contributors to expected movement"
             >
 
             <div class="table-wrapper">
                 {
                     dataframe_to_html(
                         explanation_result
-                        .contributions
-                        .drop(
-                            columns=[
-                                "absolute_contribution",
+                        .contribution_df[
+                            [
+                                "feature",
+                                "previous_value",
+                                "current_value",
+                                "value_change",
+                                "model_expected_contribution",
+                                "proportional_actual_contribution",
+                                "direction",
                             ]
-                        ),
+                        ],
                         decimals=3,
                         max_rows=20,
                     )
@@ -809,6 +892,18 @@ def build_model_report(
                 Feature importance
             </h2>
 
+            <p>
+                <strong>Relative importance</strong> sets the most important
+                feature to 100 and expresses every other feature relative to
+                it. A score of 50 means the feature is approximately half as
+                influential as the leading feature in this model.
+                <strong>Stability</strong> compares importance variation with
+                the importance estimate itself: high means the result was
+                consistent across shuffles, while low means it varied more.
+                Raw importance and importance_std are retained for technical
+                reference.
+            </p>
+
             <img
                 class="chart"
                 src="data:image/png;base64,{importance_image}"
@@ -818,7 +913,7 @@ def build_model_report(
             <div class="table-wrapper">
                 {
                     dataframe_to_html(
-                        importance_df,
+                        report_importance_df,
                         decimals=4,
                         max_rows=20,
                     )
@@ -869,4 +964,3 @@ def build_model_report(
     )
 
     return output_path
-
