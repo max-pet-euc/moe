@@ -22,6 +22,7 @@ from sklearn.metrics import (
 
 from config.settings import (
     ALWAYS_EXCLUDED_COLUMNS,
+    CUSTOM_EXCLUDE_COLUMNS,
     ENGINEERED_DIR,
     FUNNEL_ORDER,
     MODEL_OUTPUT_DIR,
@@ -60,8 +61,9 @@ test_days = TEST_DAYS
 funnel_order = FUNNEL_ORDER
 model_targets = MODEL_TARGETS
 stage_aliases = STAGE_ALIASES
-always_excluded_columns = (
+excluded_columns = (
     ALWAYS_EXCLUDED_COLUMNS
+    | CUSTOM_EXCLUDE_COLUMNS
 )
 
 model_output_dir = MODEL_OUTPUT_DIR

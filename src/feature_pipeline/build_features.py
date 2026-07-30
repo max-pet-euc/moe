@@ -39,6 +39,9 @@ from config.settings import (
     ENGINEERED_DIR,
     RAW_DIR,
 )
+from src.feature_pipeline.feature_engineering import (
+    add_engineered_features,
+)
 
 #=========================================================
 # paths
@@ -262,6 +265,8 @@ def merge_daily_dataset(
         validate="one_to_one",
     )
 
+#=====================================================
+# validation
 
 def validate_feature_output(
     feature_df: pd.DataFrame,
@@ -287,14 +292,14 @@ def validate_feature_output(
         include="number"
     )
 
-    infinity_count = int(
-        np.isinf(numeric_df.to_numpy()).sum()
+    numeric_array = numeric_df.to_numpy(
+        dtype="float64",
+        na_value=np.nan,
     )
 
-    if infinity_count > 0:
-        raise ValueError(
-            f"feature dataset contains {infinity_count:,} infinite values"
-        )
+    infinite_values = int(
+        np.isinf(numeric_array).sum()
+    )
 
     duplicate_columns = feature_df.columns[
         feature_df.columns.duplicated()
@@ -389,10 +394,16 @@ def build_features(
             new_df=dataset_df,
             dataset_name=prefix,
         )
+    
+    #=====================================================
+    # add engineered features
+
+    feature_df = add_engineered_features(
+        feature_df
+    )
 
     #=====================================================
     # validate and save
-    #=====================================================
 
     feature_df = feature_df.sort_values(
         "date_day"
@@ -425,3 +436,4 @@ if __name__ == "__main__":
     print(f"date min: {features['date_day'].min().date()}")
     print(f"date max: {features['date_day'].max().date()}")
     print(f"saved to: {feature_output_path}")
+

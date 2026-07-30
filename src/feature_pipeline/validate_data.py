@@ -431,6 +431,121 @@ def _validate_value_column(
             details="value contains non-numeric entries",
         )
 
+def _validate_engineered_ratios(
+    df: pd.DataFrame,
+    dataset: str,
+    results: list[dict[str, Any]],
+) -> None:
+    """
+    Validate engineered ratios for infinity and impossible
+    percentage values.
+    """
+
+    ratio_suffixes = (
+        "_qs_cvr",
+        "_ctr",
+        "_cpi",
+        "_cpc",
+        "_cpqs",
+        "_impression_share",
+        "_top_impression_share",
+        "_pct_top_impressions",
+        "_pct_digital",
+        "_pct_total",
+    )
+
+    ratio_columns = [
+        column
+        for column in df.columns
+        if column.endswith(
+            ratio_suffixes
+        )
+    ]
+
+    if not ratio_columns:
+        return
+
+    numeric_ratios = df[
+        ratio_columns
+    ].apply(
+        pd.to_numeric,
+        errors="coerce",
+    )
+
+    infinite_count = int(
+        np.isinf(
+            numeric_ratios.to_numpy()
+        ).sum()
+    )
+
+    _add_result(
+        results=results,
+        dataset=dataset,
+        check="engineered_ratio_infinity",
+        status=(
+            "pass"
+            if infinite_count == 0
+            else "fail"
+        ),
+        affected_rows=infinite_count,
+        details=(
+            "engineered ratios contain no infinity"
+            if infinite_count == 0
+            else "engineered ratios contain infinity"
+        ),
+    )
+
+    percentage_suffixes = (
+        "_qs_cvr",
+        "_ctr",
+        "_impression_share",
+        "_top_impression_share",
+        "_pct_top_impressions",
+        "_pct_digital",
+        "_pct_total",
+    )
+
+    percentage_columns = [
+        column
+        for column in ratio_columns
+        if column.endswith(
+            percentage_suffixes
+        )
+    ]
+
+    if percentage_columns:
+        percentage_values = numeric_ratios[
+            percentage_columns
+        ]
+
+        outside_expected_range = (
+            percentage_values.lt(0)
+            | percentage_values.gt(1)
+        )
+
+        affected_count = int(
+            outside_expected_range.sum().sum()
+        )
+
+        _add_result(
+            results=results,
+            dataset=dataset,
+            check="engineered_percentage_range",
+            status=(
+                "pass"
+                if affected_count == 0
+                else "warning"
+            ),
+            affected_rows=affected_count,
+            details=(
+                "percentage ratios are between 0 and 1"
+                if affected_count == 0
+                else (
+                    "some percentage ratios are outside "
+                    "the expected 0 to 1 range"
+                )
+            ),
+        )
 
 #=========================================================
 # validation pipeline

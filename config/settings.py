@@ -4,7 +4,6 @@ Global project settings.
 
 from pathlib import Path
 
-
 # ==========================================================
 # Project paths
 
@@ -95,6 +94,19 @@ ALWAYS_EXCLUDED_COLUMNS = {
     "cohorted_qs",
     "cohorted_qc",
     "cohorted_qe",
+}
+
+CUSTOM_EXCLUDE_COLUMNS = {
+    # raw spend columns replaced by engineered features
+    "spend_meta",
+    "spend_tiktok",
+    "spend_search_brand",
+    "spend_search_nb",
+    "spend_search_pmax",
+    "spend_search_shopping",
+    "spend_search_bing",
+    "spend_search_youtube",
+    "spend_reddit",
 }
 
 MODEL_OUTPUT_DIR = (
