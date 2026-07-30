@@ -1309,6 +1309,15 @@ def build_model_report(
         else "neutral"
     )
 
+    if np.isnan(
+        explanation_result.actual_change_pct
+    ):
+        actual_change_pct_display = "N/A"
+    else:
+        actual_change_pct_display = (
+            f"{explanation_result.actual_change_pct:+,.1f}%"
+        )
+
     html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -1359,6 +1368,13 @@ def build_model_report(
             font-size: 12px;
             font-weight: 700;
             opacity: .78;
+        }}
+        
+        .period-label {{
+            margin-top: 10px;
+            font-size: 15px;
+            color: #d9d5ff;
+            font-weight: 600;
         }}
 
         .hero h1 {{ margin: 8px 0 8px; font-size: 38px; }}
@@ -1438,15 +1454,22 @@ def build_model_report(
 <div class="page">
     <section class="hero">
         <div class="eyebrow">Marketing Optimisation Engine · Report v{REPORT_VERSION}</div>
-        <h1>{model_stage.upper()} {model_grain.title()} Performance Story</h1>
+        <h1>{model_stage.upper()} Period Comparison</h1>
+        <p class="period-label">
+            {explanation_result.current_period}
+            compared with
+            {explanation_result.previous_period}
+        </p>
         <p>{executive_story} {unusualness_text}</p>
     </section>
 
     <section class="scorecard">
         <div class="metric-card">
-            <div class="metric-label">Current actual</div>
+            <div class="metric-label">Current period actual</div>
             <div class="metric-value">{explanation_result.current_actual:,.1f}</div>
-            <div class="metric-sub">Previous: {explanation_result.previous_actual:,.1f}</div>
+            <div class="metric-sub">
+                {explanation_result.current_period}
+            </div>
         </div>
         <div class="metric-card neutral">
             <div class="metric-label">Actual movement</div>
@@ -1464,6 +1487,17 @@ def build_model_report(
             <div class="metric-sub">Actual minus expected movement</div>
         </div>
         <div class="metric-card">
+            <div class="metric-label">Previous period actual</div>
+            <div class="metric-value">{explanation_result.previous_actual:,.1f}</div>
+            <div class="metric-sub">
+                {explanation_result.previous_period}
+            </div>
+        </div>
+        <div class="metric-sub">
+            {actual_change_pct_display}
+            versus previous period
+        </div>
+        <div class="metric-card">
             <div class="metric-label">Reliability</div>
             <div class="metric-value">{confidence_display}</div>
             <div class="metric-sub">Heuristic historical score</div>
@@ -1477,7 +1511,12 @@ def build_model_report(
 
     <section class="card">
         <h2>Why the model changed</h2>
-        <p class="section-intro">The waterfall starts at the previous prediction, adds the largest SHAP movement contributions, and ends at the current prediction. The actual result is shown only as context.</p>
+        <p class="section-intro">
+            The waterfall starts with the model's total prediction for
+            {explanation_result.previous_period}, adds the summed daily SHAP
+            contribution changes, and ends with the model's total prediction for
+            {explanation_result.current_period}.
+        </p>
         <img class="chart" src="data:image/png;base64,{waterfall_image}" alt="Prediction movement waterfall">
     </section>
 
@@ -1525,13 +1564,13 @@ def build_model_report(
 
     <section class="card">
         <h2>Unusually high or low feature values</h2>
-        <p class="section-intro">Current feature values compared with the SHAP reference distribution. Values near the 0th or 100th percentile are unusual; this is context, not proof of causality.</p>
+        <p class="section-intro">Average daily feature values during the selected period compared with the historical reference distribution.</p>
         <div class="table-wrapper">{dataframe_to_html(unusual_feature_df, decimals=2, max_rows=10)}</div>
     </section>
 
     <section class="card">
         <h2>Priority levers to review</h2>
-        <p class="section-intro">This ranking combines global feature importance with how active each feature was in the latest predicted movement. It identifies where to investigate first; it does not prove causality or prescribe spend changes.</p>
+        <p class="section-intro">This ranking combines global feature importance with how active each feature was in the selected predicted movement. It identifies where to investigate first; it does not prove causality or prescribe spend changes.</p>
         <div class="table-wrapper">{dataframe_to_html(opportunity_df[["feature", "relative_importance", "stability", "previous_value", "current_value", "value_change", "model_expected_contribution", "latest_direction", "priority_score"]], decimals=3)}</div>
     </section>
 

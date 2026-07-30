@@ -35,6 +35,10 @@ from config.settings import (
     MODEL_GRAIN,
     MODEL_GRAIN_COLUMNS,
     VALID_MODEL_GRAINS,
+    REPORT_START_DATE,
+    REPORT_END_DATE,
+    REPORT_PERIOD_AGGREGATION,
+    VALID_REPORT_PERIOD_AGGREGATIONS,
 )
 
 from src.modelling.feature_selection import select_features
@@ -49,7 +53,7 @@ from src.modelling.html_report import (
     build_model_report,
 )
 from src.modelling.explain import (
-    explain_latest_change,
+    explain_period_change,
 )
 
 #=========================================================
@@ -87,6 +91,49 @@ model_date_column = (
     MODEL_GRAIN_COLUMNS[
         model_grain
     ]
+)
+
+#=========================================================
+#==config dates
+
+report_start_date = pd.Timestamp(
+    REPORT_START_DATE
+).normalize()
+
+report_end_date = pd.Timestamp(
+    REPORT_END_DATE
+).normalize()
+
+if report_start_date > report_end_date:
+    raise ValueError(
+        "REPORT_START_DATE must be on or before "
+        "REPORT_END_DATE"
+    )
+
+if (
+    REPORT_PERIOD_AGGREGATION
+    not in VALID_REPORT_PERIOD_AGGREGATIONS
+):
+    raise ValueError(
+        "invalid REPORT_PERIOD_AGGREGATION: "
+        f"{REPORT_PERIOD_AGGREGATION}"
+    )
+
+report_period_days = (
+    report_end_date
+    - report_start_date
+).days + 1
+
+previous_end_date = (
+    report_start_date
+    - pd.Timedelta(days=1)
+)
+
+previous_start_date = (
+    previous_end_date
+    - pd.Timedelta(
+        days=report_period_days - 1
+    )
 )
 
 
@@ -233,7 +280,7 @@ model_df = (
         & df[target_column].notna()
         & (
             df["date_day"]
-            <= pd.Timestamp.today().normalize()
+            <= report_end_date
         )
     ]
     .sort_values(
@@ -249,6 +296,116 @@ if model_df.empty:
         "no rows available for modelling"
     )
 
+available_dates = set(
+    model_df["date_day"]
+    .dropna()
+    .dt.normalize()
+)
+
+expected_current_dates = set(
+    pd.date_range(
+        report_start_date,
+        report_end_date,
+        freq="D",
+    )
+)
+
+expected_previous_dates = set(
+    pd.date_range(
+        previous_start_date,
+        previous_end_date,
+        freq="D",
+    )
+)
+
+current_dates = sorted(
+    available_dates.intersection(
+        expected_current_dates
+    )
+)
+
+previous_dates = sorted(
+    available_dates.intersection(
+        expected_previous_dates
+    )
+)
+
+missing_current_dates = sorted(
+    expected_current_dates
+    - available_dates
+)
+
+missing_previous_dates = sorted(
+    expected_previous_dates
+    - available_dates
+)
+
+if missing_current_dates:
+    print(
+        "Warning: missing current reporting dates: "
+        + ", ".join(
+            str(date.date())
+            for date in missing_current_dates
+        )
+    )
+
+if missing_previous_dates:
+    print(
+        "Warning: missing previous reporting dates: "
+        + ", ".join(
+            str(date.date())
+            for date in missing_previous_dates
+        )
+    )
+
+if not current_dates:
+    raise ValueError(
+        "no available dates found in the "
+        "current reporting period"
+    )
+
+if not previous_dates:
+    raise ValueError(
+        "no available dates found in the "
+        "previous reporting period"
+    )
+
+# Keep both periods comparable by using the
+# same number of available days.
+comparison_days = min(
+    len(current_dates),
+    len(previous_dates),
+)
+
+current_dates = current_dates[
+    -comparison_days:
+]
+
+previous_dates = previous_dates[
+    -comparison_days:
+]
+
+report_start_date = min(current_dates)
+report_end_date = max(current_dates)
+
+previous_start_date = min(previous_dates)
+previous_end_date = max(previous_dates)
+
+print(
+    "\nEffective current reporting period:",
+    report_start_date.date(),
+    "to",
+    report_end_date.date(),
+    f"({len(current_dates)} available days)",
+)
+
+print(
+    "Effective previous reporting period:",
+    previous_start_date.date(),
+    "to",
+    previous_end_date.date(),
+    f"({len(previous_dates)} available days)",
+)
 
 #=========================================================
 #==select features
@@ -281,6 +438,12 @@ test_start_date = (
         days=test_days - 1
     )
 )
+
+if previous_start_date < test_start_date:
+    raise ValueError(
+        "selected comparison periods fall outside "
+        "the model test window. Increase TEST_DAYS."
+    )
 
 train_mask = (
     model_df["date_day"]
@@ -558,6 +721,7 @@ print(
     f"{test_start_date.date()}"
 )
 
+
 print("\n=====================================")
 print("==model comparison")
 print(
@@ -568,9 +732,11 @@ print(
     )
 )
 
+
 print("\n=====================================")
 print("==best model")
 print(best_model_name)
+
 
 print("\n=====================================")
 print("==top features")
@@ -583,6 +749,7 @@ print(
     )
 )
 
+
 print("\n=====================================")
 print("==outputs")
 print(f"model: {model_file}")
@@ -594,6 +761,23 @@ print(
 )
 print(f"feature list: {feature_list_file}")
 
+
+print("\n=====================================")
+print("==reporting period")
+print(
+    "current: "
+    f"{report_start_date.date()} "
+    f"to {report_end_date.date()}"
+)
+print(
+    "previous: "
+    f"{previous_start_date.date()} "
+    f"to {previous_end_date.date()}"
+)
+print(
+    "aggregation: "
+    f"{REPORT_PERIOD_AGGREGATION}"
+)
 
 #=========================================================
 #==html output
@@ -611,16 +795,24 @@ report_file = (
 #==explain latest change
 
 explanation_result = (
-    explain_latest_change(
+    explain_period_change(
         model=best_model,
         x_reference=x_train,
         x_explain=x_test,
         prediction_df=prediction_df,
         model_stage=model_stage,
         model_grain=model_grain,
+        current_start_date=report_start_date,
+        current_end_date=report_end_date,
+        previous_start_date=previous_start_date,
+        previous_end_date=previous_end_date,
+        aggregation=(
+            REPORT_PERIOD_AGGREGATION
+        ),
         date_column="date_day",
     )
 )
+
 #=========================================================
 #==build html report
 

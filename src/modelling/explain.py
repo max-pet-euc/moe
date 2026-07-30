@@ -1,11 +1,14 @@
 """
-Explain movement between the latest two modelled periods.
+Explain movement between two configured modelled periods.
 
-Report contract version 2.0 adds explicit movement, surprise and driver views.
+Report contract version 2.2 adds:
+- configurable current and previous date ranges;
+- period-level actual and prediction aggregation;
+- SHAP aggregation across every row in both periods;
+- rolling like-for-like historical movement ranking;
+- average daily feature values for descriptive context.
+
 """
-
-EXPLANATION_VERSION = "2.1-20260729"
-EXPLANATION_FILENAME = "explain_report_v2_20260729.py"
 
 from dataclasses import dataclass
 
@@ -69,9 +72,37 @@ class ExplanationResult:
         return self.actual_vs_expected_movement
 
 
+def _format_period(
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
+) -> str:
+    """Format a reporting period for use in the HTML narrative."""
+
+    return (
+        f"{start_date:%d %b %Y}"
+        f" – "
+        f"{end_date:%d %b %Y}"
+    )
+
+
+def _movement_text(
+    change: float,
+) -> str:
+    """Return a grammatically complete description of a numeric movement."""
+
+    if change > 0:
+        return f"rose by {abs(change):,.1f}"
+
+    if change < 0:
+        return f"fell by {abs(change):,.1f}"
+
+    return "was unchanged"
+
+
 def build_summary(
     model_stage: str,
-    model_grain: str,
+    previous_period,
+    current_period,
     previous_actual: float,
     current_actual: float,
     actual_change: float,
@@ -81,52 +112,36 @@ def build_summary(
     actual_vs_expected_movement: float,
     contributions: pd.DataFrame,
 ) -> str:
+    """Build the report's plain-English period comparison narrative."""
 
     stage_label = model_stage.upper()
 
-    grain_labels = {
-        "daily": "latest day",
-        "weekly": "latest week",
-        "monthly": "latest month",
-    }
-
-    period_label = grain_labels.get(
-        model_grain,
-        "latest period",
-    )
-
-    def movement_text(
-        change: float,
-    ) -> str:
-
-        if change > 0:
-            return f"rose by {abs(change):,.1f}"
-
-        if change < 0:
-            return f"fell by {abs(change):,.1f}"
-
-        return "was unchanged"
-
     actual_sentence = (
-        f"Actual {stage_label} {movement_text(actual_change)}, "
-        f"from {previous_actual:,.1f} to {current_actual:,.1f}, "
-        f"in the {period_label}."
+        f"Actual {stage_label} "
+        f"{_movement_text(actual_change)}, "
+        f"from {previous_actual:,.1f} in "
+        f"{previous_period} to "
+        f"{current_actual:,.1f} in "
+        f"{current_period}."
     )
 
     prediction_sentence = (
-        f"The model expected {stage_label} to "
-        f"{movement_text(predicted_change)}, from "
-        f"{previous_predicted:,.1f} to {current_predicted:,.1f}."
+        f"The model expected {stage_label} "
+        f"to move from {previous_predicted:,.1f} to "
+        f"{current_predicted:,.1f}, "
+        f"a change of {predicted_change:+,.1f}."
     )
 
     if actual_vs_expected_movement > 0:
         surprise_sentence = (
-            f"Actual movement was {abs(actual_vs_expected_movement):,.1f} "
+            f"Actual movement was "
+            f"{abs(actual_vs_expected_movement):,.1f} "
             "better than expected."
         )
     elif actual_vs_expected_movement < 0:
         surprise_sentence = (
-            f"Actual movement was {abs(actual_vs_expected_movement):,.1f} "
+            f"Actual movement was "
+            f"{abs(actual_vs_expected_movement):,.1f} "
             "worse than expected."
         )
     else:
@@ -165,7 +180,6 @@ def build_summary(
     driver_sentences = []
 
     if not positive_contributors.empty:
-
         positive_text = ", ".join(
             (
                 f"{row.feature} "
@@ -179,7 +193,6 @@ def build_summary(
         )
 
     if not negative_contributors.empty:
-
         negative_text = ", ".join(
             (
                 f"{row.feature} "
@@ -201,23 +214,184 @@ def build_summary(
         ]
     )
 
-def explain_latest_change(
+
+def aggregate_values(
+    values,
+    aggregation: str,
+) -> float:
+    """Aggregate a numeric period using the configured reporting method."""
+
+    numeric_values = pd.to_numeric(
+        values,
+        errors="coerce",
+    )
+
+    if numeric_values.isna().all():
+        return np.nan
+
+    if aggregation == "sum":
+        return float(
+            numeric_values.sum(
+                min_count=1,
+            )
+        )
+
+    if aggregation == "mean":
+        return float(
+            numeric_values.mean()
+        )
+
+    raise ValueError(
+        f"unsupported aggregation: {aggregation}"
+    )
+
+
+def _aggregate_shap_values(
+    shap_values: np.ndarray,
+    aggregation: str,
+) -> np.ndarray:
+    """Aggregate row-level SHAP values into a period-level explanation."""
+
+    if aggregation == "sum":
+        return shap_values.sum(
+            axis=0
+        )
+
+    if aggregation == "mean":
+        return shap_values.mean(
+            axis=0
+        )
+
+    raise ValueError(
+        f"unsupported aggregation: {aggregation}"
+    )
+
+
+def _aggregate_base_values(
+    base_values: np.ndarray,
+    aggregation: str,
+) -> float:
+    """Aggregate row-level SHAP base values consistently with predictions."""
+
+    flattened_values = np.asarray(
+        base_values
+    ).reshape(-1)
+
+    if aggregation == "sum":
+        return float(
+            flattened_values.sum()
+        )
+
+    if aggregation == "mean":
+        return float(
+            flattened_values.mean()
+        )
+
+    raise ValueError(
+        f"unsupported aggregation: {aggregation}"
+    )
+
+
+def _historical_period_movements(
+    prediction_data: pd.DataFrame,
+    actual_column: str,
+    date_column: str,
+    period_days: int,
+    aggregation: str,
+) -> pd.Series:
+    """
+    Create like-for-like historical movements.
+
+    For a seven-day report, this compares each rolling seven-day value with
+    the immediately preceding seven-day value.
+    """
+
+    actual_series = (
+        prediction_data
+        .sort_values(
+            date_column
+        )
+        .set_index(
+            date_column
+        )[
+            actual_column
+        ]
+        .pipe(
+            pd.to_numeric,
+            errors="coerce",
+        )
+    )
+
+    if aggregation == "sum":
+        historical_period_values = (
+            actual_series
+            .rolling(
+                window=period_days,
+                min_periods=period_days,
+            )
+            .sum()
+        )
+    elif aggregation == "mean":
+        historical_period_values = (
+            actual_series
+            .rolling(
+                window=period_days,
+                min_periods=period_days,
+            )
+            .mean()
+        )
+    else:
+        raise ValueError(
+            f"unsupported aggregation: {aggregation}"
+        )
+
+    return (
+        historical_period_values
+        - historical_period_values.shift(
+            period_days
+        )
+    ).dropna().abs()
+
+
+def explain_period_change(
     model,
     x_reference: pd.DataFrame,
     x_explain: pd.DataFrame,
     prediction_df: pd.DataFrame,
     model_stage: str,
     model_grain: str,
+    current_start_date,
+    current_end_date,
+    previous_start_date,
+    previous_end_date,
+    aggregation: str = "sum",
     date_column: str = "date_day",
     background_rows: int = 100,
     random_state: int = 42,
 ) -> ExplanationResult:
+    """
+    Explain the modelled movement between two configured reporting periods.
 
-    if len(x_explain) < 2:
+    The model remains daily. Actuals, predictions, SHAP values and SHAP base
+    values are aggregated across every daily row in each reporting period.
+    """
 
+    del model_grain  # Retained in the public signature for compatibility.
+
+    valid_aggregations = {
+        "sum",
+        "mean",
+    }
+
+    if aggregation not in valid_aggregations:
         raise ValueError(
-            "at least two periods are required "
-            "to explain the latest movement"
+            "aggregation must be one of: "
+            f"{sorted(valid_aggregations)}"
+        )
+
+    if x_explain.empty:
+        raise ValueError(
+            "x_explain cannot be empty"
         )
 
     actual_column = (
@@ -242,12 +416,9 @@ def explain_latest_change(
     )
 
     if missing_columns:
-
         raise ValueError(
-            (
-                "prediction dataframe is missing: "
-                f"{sorted(missing_columns)}"
-            )
+            "prediction dataframe is missing: "
+            f"{sorted(missing_columns)}"
         )
 
     prediction_data = (
@@ -267,12 +438,9 @@ def explain_latest_change(
     )
 
     if len(prediction_data) != len(feature_data):
-
         raise ValueError(
-            (
-                "prediction_df and x_explain must "
-                "contain the same number of rows"
-            )
+            "prediction_df and x_explain must "
+            "contain the same number of rows"
         )
 
     prediction_data[
@@ -282,47 +450,138 @@ def explain_latest_change(
             date_column
         ],
         errors="coerce",
-    )
+    ).dt.normalize()
 
     if prediction_data[
         date_column
     ].isna().any():
-
         raise ValueError(
-            (
-                f"{date_column} contains values "
-                "that could not be converted to dates"
-            )
+            f"{date_column} contains values "
+            "that could not be converted to dates"
         )
 
-    ordered_positions = (
+    current_start_date = pd.Timestamp(
+        current_start_date
+    ).normalize()
+
+    current_end_date = pd.Timestamp(
+        current_end_date
+    ).normalize()
+
+    previous_start_date = pd.Timestamp(
+        previous_start_date
+    ).normalize()
+
+    previous_end_date = pd.Timestamp(
+        previous_end_date
+    ).normalize()
+
+    if current_start_date > current_end_date:
+        raise ValueError(
+            "current_start_date must be on or before "
+            "current_end_date"
+        )
+
+    if previous_start_date > previous_end_date:
+        raise ValueError(
+            "previous_start_date must be on or before "
+            "previous_end_date"
+        )
+
+    current_period_days = (
+        current_end_date
+        - current_start_date
+    ).days + 1
+
+    previous_period_days = (
+        previous_end_date
+        - previous_start_date
+    ).days + 1
+
+    if current_period_days != previous_period_days:
+        raise ValueError(
+            "current and previous reporting periods "
+            "must contain the same number of days"
+        )
+
+    current_mask = (
         prediction_data[
             date_column
         ]
-        .sort_values()
-        .index
-        .tolist()
+        .between(
+            current_start_date,
+            current_end_date,
+            inclusive="both",
+        )
     )
 
-    previous_position = (
-        ordered_positions[-2]
+    previous_mask = (
+        prediction_data[
+            date_column
+        ]
+        .between(
+            previous_start_date,
+            previous_end_date,
+            inclusive="both",
+        )
     )
 
-    current_position = (
-        ordered_positions[-1]
+    if not current_mask.any():
+        raise ValueError(
+            "no prediction rows found for the "
+            "current reporting period"
+        )
+
+    if not previous_mask.any():
+        raise ValueError(
+            "no prediction rows found for the "
+            "previous reporting period"
+        )
+
+    current_positions = np.flatnonzero(
+        current_mask.to_numpy()
     )
 
-    explain_positions = [
-        previous_position,
-        current_position,
-    ]
+    previous_positions = np.flatnonzero(
+        previous_mask.to_numpy()
+    )
 
-    explain_features = (
+    current_features = (
         feature_data
         .iloc[
-            explain_positions
+            current_positions
         ]
         .copy()
+    )
+
+    previous_features = (
+        feature_data
+        .iloc[
+            previous_positions
+        ]
+        .copy()
+    )
+
+    if len(current_features) != current_period_days:
+        raise ValueError(
+            "current reporting period contains "
+            f"{len(current_features)} rows but "
+            f"{current_period_days} daily rows were expected"
+        )
+
+    if len(previous_features) != previous_period_days:
+        raise ValueError(
+            "previous reporting period contains "
+            f"{len(previous_features)} rows but "
+            f"{previous_period_days} daily rows were expected"
+        )
+
+    explain_features = pd.concat(
+        [
+            previous_features,
+            current_features,
+        ],
+        ignore_index=True,
     )
 
     reference_data = (
@@ -330,8 +589,12 @@ def explain_latest_change(
         .copy()
     )
 
-    if len(reference_data) > background_rows:
+    if reference_data.empty:
+        raise ValueError(
+            "x_reference cannot be empty"
+        )
 
+    if len(reference_data) > background_rows:
         reference_data = (
             reference_data
             .sample(
@@ -356,6 +619,10 @@ def explain_latest_change(
         algorithm="permutation",
     )
 
+    previous_row_count = len(
+        previous_features
+    )
+
     minimum_evaluations = (
         2
         * len(
@@ -372,63 +639,105 @@ def explain_latest_change(
         ),
     )
 
-    previous_shap = np.asarray(
-        shap_values.values[0]
-    ).reshape(-1)
+    all_shap_values = np.asarray(
+        shap_values.values
+    )
 
-    current_shap = np.asarray(
-        shap_values.values[1]
-    ).reshape(-1)
+    previous_shap_values = (
+        all_shap_values[
+            :previous_row_count
+        ]
+    )
+
+    current_shap_values = (
+        all_shap_values[
+            previous_row_count:
+        ]
+    )
+
+    previous_shap = _aggregate_shap_values(
+        previous_shap_values,
+        aggregation=aggregation,
+    )
+
+    current_shap = _aggregate_shap_values(
+        current_shap_values,
+        aggregation=aggregation,
+    )
 
     model_expected_contribution = (
         current_shap
         - previous_shap
     )
 
-    current_base_value = np.asarray(
-        shap_values.base_values[1]
+    all_base_values = np.asarray(
+        shap_values.base_values
     ).reshape(-1)
 
-    expected_value = float(
-        current_base_value[0]
+    previous_base_values = (
+        all_base_values[
+            :previous_row_count
+        ]
     )
 
-    previous_row = (
+    current_base_values = (
+        all_base_values[
+            previous_row_count:
+        ]
+    )
+
+    previous_expected_value = _aggregate_base_values(
+        previous_base_values,
+        aggregation=aggregation,
+    )
+
+    expected_value = _aggregate_base_values(
+        current_base_values,
+        aggregation=aggregation,
+    )
+
+    previous_prediction_data = (
         prediction_data
-        .iloc[
-            previous_position
+        .loc[
+            previous_mask
         ]
+        .copy()
     )
 
-    current_row = (
+    current_prediction_data = (
         prediction_data
-        .iloc[
-            current_position
+        .loc[
+            current_mask
         ]
+        .copy()
     )
 
-    previous_actual = float(
-        previous_row[
+    previous_actual = aggregate_values(
+        previous_prediction_data[
             actual_column
-        ]
+        ],
+        aggregation=aggregation,
     )
 
-    current_actual = float(
-        current_row[
+    current_actual = aggregate_values(
+        current_prediction_data[
             actual_column
-        ]
+        ],
+        aggregation=aggregation,
     )
 
-    previous_predicted = float(
-        previous_row[
+    previous_predicted = aggregate_values(
+        previous_prediction_data[
             predicted_column
-        ]
+        ],
+        aggregation=aggregation,
     )
 
-    current_predicted = float(
-        current_row[
+    current_predicted = aggregate_values(
+        current_prediction_data[
             predicted_column
-        ]
+        ],
+        aggregation=aggregation,
     )
 
     actual_change = (
@@ -456,60 +765,112 @@ def explain_latest_change(
         - expected_value
     )
 
-    if previous_actual == 0:
-
+    if previous_actual == 0 or pd.isna(previous_actual):
         actual_change_pct = np.nan
-
     else:
-
         actual_change_pct = (
             actual_change
             / previous_actual
             * 100
         )
 
-    if predicted_change == 0:
-
+    if predicted_change == 0 or pd.isna(predicted_change):
         movement_scaling_factor = np.nan
-
     else:
-
         movement_scaling_factor = (
             actual_change
             / predicted_change
         )
 
-    proportional_actual_contribution = (
-        model_expected_contribution
-        * movement_scaling_factor
+    if pd.isna(movement_scaling_factor):
+        proportional_actual_contribution = np.full(
+            shape=len(
+                model_expected_contribution
+            ),
+            fill_value=np.nan,
+            dtype=float,
+        )
+    else:
+        proportional_actual_contribution = (
+            model_expected_contribution
+            * movement_scaling_factor
+        )
+
+    # Feature values are displayed as average daily values even when the
+    # target and SHAP effects are summed across the reporting period.
+    previous_feature_values = (
+        previous_features
+        .apply(
+            pd.to_numeric,
+            errors="coerce",
+        )
+        .mean(
+            axis=0
+        )
     )
 
-    # Compare the current feature values with the reference distribution.
+    current_feature_values = (
+        current_features
+        .apply(
+            pd.to_numeric,
+            errors="coerce",
+        )
+        .mean(
+            axis=0
+        )
+    )
+
     # Percentiles are descriptive context only, not causal evidence.
     current_feature_percentiles = []
+
     for feature in feature_data.columns:
         reference_values = pd.to_numeric(
-            reference_data[feature],
+            reference_data[
+                feature
+            ],
             errors="coerce",
         ).dropna()
-        current_value = pd.to_numeric(
-            pd.Series([explain_features.iloc[1][feature]]),
-            errors="coerce",
-        ).iloc[0]
 
-        if reference_values.empty or pd.isna(current_value):
-            current_feature_percentiles.append(np.nan)
+        current_value = (
+            current_feature_values[
+                feature
+            ]
+        )
+
+        if (
+            reference_values.empty
+            or pd.isna(
+                current_value
+            )
+        ):
+            current_feature_percentiles.append(
+                np.nan
+            )
         else:
             current_feature_percentiles.append(
-                float((reference_values <= current_value).mean() * 100)
+                float(
+                    (
+                        reference_values
+                        <= current_value
+                    )
+                    .mean()
+                    * 100
+                )
             )
 
-    actual_series = pd.to_numeric(
-        prediction_data[actual_column],
-        errors="coerce",
+    historical_movements = (
+        _historical_period_movements(
+            prediction_data=prediction_data,
+            actual_column=actual_column,
+            date_column=date_column,
+            period_days=current_period_days,
+            aggregation=aggregation,
+        )
     )
-    historical_movements = actual_series.diff().dropna().abs()
-    current_abs_movement = abs(actual_change)
+
+    current_abs_movement = abs(
+        actual_change
+    )
 
     if historical_movements.empty:
         movement_percentile = np.nan
@@ -517,33 +878,41 @@ def explain_latest_change(
         movement_history_count = 0
     else:
         movement_percentile = float(
-            (historical_movements <= current_abs_movement).mean() * 100
+            (
+                historical_movements
+                <= current_abs_movement
+            )
+            .mean()
+            * 100
         )
+
         movement_rank = int(
-            (historical_movements > current_abs_movement).sum() + 1
+            (
+                historical_movements
+                > current_abs_movement
+            )
+            .sum()
+            + 1
         )
-        movement_history_count = int(len(historical_movements))
+
+        movement_history_count = int(
+            len(
+                historical_movements
+            )
+        )
 
     contributions = pd.DataFrame(
         {
             "feature": feature_data.columns,
             "previous_value": (
-                explain_features
-                .iloc[0]
-                .values
+                previous_feature_values.values
             ),
             "current_value": (
-                explain_features
-                .iloc[1]
-                .values
+                current_feature_values.values
             ),
             "value_change": (
-                explain_features
-                .iloc[1]
-                .values
-                - explain_features
-                .iloc[0]
-                .values
+                current_feature_values.values
+                - previous_feature_values.values
             ),
             "model_expected_contribution": (
                 model_expected_contribution
@@ -559,9 +928,12 @@ def explain_latest_change(
 
     contributions[
         "absolute_model_expected_contribution"
-    ] = contributions[
-        "model_expected_contribution"
-    ].abs()
+    ] = (
+        contributions[
+            "model_expected_contribution"
+        ]
+        .abs()
+    )
 
     contributions[
         "direction"
@@ -574,7 +946,6 @@ def explain_latest_change(
     )
 
     if predicted_change < 0:
-
         contributions = (
             contributions
             .sort_values(
@@ -585,9 +956,7 @@ def explain_latest_change(
                 drop=True
             )
         )
-
     else:
-
         contributions = (
             contributions
             .sort_values(
@@ -599,30 +968,61 @@ def explain_latest_change(
             )
         )
 
+    previous_period_label = _format_period(
+        previous_start_date,
+        previous_end_date,
+    )
+
+    current_period_label = _format_period(
+        current_start_date,
+        current_end_date,
+    )
+
     summary = build_summary(
         model_stage=model_stage,
-        model_grain=model_grain,
+        previous_period=previous_period_label,
+        current_period=current_period_label,
         previous_actual=previous_actual,
         current_actual=current_actual,
         actual_change=actual_change,
         previous_predicted=previous_predicted,
         current_predicted=current_predicted,
         predicted_change=predicted_change,
-        actual_vs_expected_movement=actual_vs_expected_movement,
+        actual_vs_expected_movement=(
+            actual_vs_expected_movement
+        ),
         contributions=contributions,
     )
 
+    # This check catches an unexpected mismatch between the SHAP decomposition
+    # and the aggregated model prediction movement.
+    shap_reconstructed_change = float(
+        (
+            current_shap.sum()
+            + expected_value
+        )
+        - (
+            previous_shap.sum()
+            + previous_expected_value
+        )
+    )
+
+    if not np.isclose(
+        shap_reconstructed_change,
+        predicted_change,
+        rtol=1e-4,
+        atol=1e-4,
+    ):
+        raise ValueError(
+            "aggregated SHAP values do not reconstruct "
+            "the modelled period movement. "
+            f"SHAP: {shap_reconstructed_change:,.6f}; "
+            f"prediction: {predicted_change:,.6f}"
+        )
+
     return ExplanationResult(
-        previous_period=pd.Timestamp(
-            previous_row[
-                date_column
-            ]
-        ),
-        current_period=pd.Timestamp(
-            current_row[
-                date_column
-            ]
-        ),
+        previous_period=previous_period_label,
+        current_period=current_period_label,
         previous_actual=previous_actual,
         current_actual=current_actual,
         previous_predicted=previous_predicted,
@@ -641,7 +1041,9 @@ def explain_latest_change(
         ),
         movement_percentile=movement_percentile,
         movement_rank=movement_rank,
-        movement_history_count=movement_history_count,
+        movement_history_count=(
+            movement_history_count
+        ),
         contribution_df=contributions,
         summary=summary,
     )

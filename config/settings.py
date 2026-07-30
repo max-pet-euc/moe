@@ -123,3 +123,16 @@ REPORT_OUTPUT_DIR = (
     OUTPUT_DIR
     / "reports"
 )
+
+#=========================================================
+#==reporting period
+
+REPORT_START_DATE = "2026-07-20"
+REPORT_END_DATE = "2026-07-26"
+
+REPORT_PERIOD_AGGREGATION = "sum"
+
+VALID_REPORT_PERIOD_AGGREGATIONS = {
+    "sum",
+    "mean",
+}
