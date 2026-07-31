@@ -1,4 +1,5 @@
 # src/feature_pipeline/engineered_features.py
+# ENGINEERED_FEATURES_VERSION = "2.1-20260730_1807"
 
 """
 Definitions for engineered marketing features.
@@ -9,23 +10,19 @@ feature-group discovery helpers only.
 Calculation logic lives in feature_engineering.py.
 
 Important:
-- Digital-platform metrics use the detailed platform dataset.
-- Spend rollups use channel-level fields from data_media_inputs.
-- Do not combine detailed and channel-level spend in the same rollup,
-  because that would double-count the same media spend.
-- Digital and offline spend groups are explicitly configured.
-- Any remaining source column beginning with "spend_" is treated as
-  other spend automatically.
+- Digital-platform metrics, including spend, use the detailed
+  date × platform × channel × metric dataset.
+- Channel-level efficiency metrics therefore use matching
+  digital spend, clicks, impressions, QS and CP columns.
+- Spend rollups for budget mix continue to use data_media_inputs.
+- Detailed digital spend must not be mixed with media-input spend
+  in the same rollup, because that would double-count spend.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-
-# =========================================================
-# Detailed digital-platform feature groups
-# =========================================================
 
 CHANNEL_METRIC_GROUPS: dict[
     str,
@@ -134,10 +131,6 @@ CHANNEL_METRIC_GROUPS: dict[
 }
 
 
-# =========================================================
-# Channel-level digital spend rollups
-# =========================================================
-
 DIGITAL_SPEND_COLUMNS: dict[str, list[str]] = {
     "meta": ["spend_meta"],
     "tiktok": ["spend_tiktok"],
@@ -155,18 +148,10 @@ DIGITAL_SPEND_COLUMNS: dict[str, list[str]] = {
 }
 
 
-# =========================================================
-# Offline spend rollups
-# =========================================================
-
 OFFLINE_SPEND_COLUMNS: dict[str, list[str]] = {
     "offline": ["spend_offline"],
 }
 
-
-# =========================================================
-# Other spend discovery
-# =========================================================
 
 def _flatten_spend_columns(
     spend_groups: dict[str, list[str]],
@@ -189,23 +174,7 @@ DEFINED_SPEND_COLUMNS: set[str] = (
 def get_other_spend_columns(
     available_columns: Iterable[str],
 ) -> dict[str, list[str]]:
-    """
-    Return unclassified spend columns as individual feature groups.
-
-    Any available column beginning with ``spend_`` is returned unless
-    it is already assigned to DIGITAL_SPEND_COLUMNS or
-    OFFLINE_SPEND_COLUMNS.
-
-    Examples
-    --------
-    ``spend_creators`` becomes::
-
-        {"creators": ["spend_creators"]}
-
-    ``spend_partnerships`` becomes::
-
-        {"partnerships": ["spend_partnerships"]}
-    """
+    """Return unclassified spend columns as individual feature groups."""
 
     other_columns = sorted(
         column
@@ -222,13 +191,8 @@ def get_other_spend_columns(
     }
 
 
-# =========================================================
-# Impression share - overall
-# =========================================================
-
 EXTERNAL_METRIC_COLUMNS: dict[str, str] = {
     "impressions": "external_impressions",
     "market_impressions": "external_market_impressions",
     "top_impressions": "external_top_impressions",
 }
-
