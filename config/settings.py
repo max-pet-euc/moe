@@ -107,6 +107,12 @@ CUSTOM_EXCLUDE_COLUMNS = {
     "spend_search_bing",
     "spend_search_youtube",
     "spend_reddit",
+    "engineered_spend_digital",
+    "engineered_spend_total",
+}
+
+EXCLUDED_COLUMN_PREFIXES = {
+    "attribution_",
 }
 
 MODEL_OUTPUT_DIR = (

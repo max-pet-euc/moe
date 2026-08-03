@@ -104,10 +104,14 @@ dataset_rules: dict[str, dict[str, Any]] = {
     DATASETS["external"]: {
         "required_columns": [
             "date_day",
+            "metric",
+            "value",
         ],
         "grain": [
             "date_day",
+            "metric",
         ],
+        "allow_future_dates": False,
     },
     DATASETS["funnel_uncohorted"]: {
         "required_columns": [

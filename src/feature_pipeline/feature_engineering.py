@@ -349,14 +349,6 @@ def add_spend_mix_features(
     )
 
     for channel_name, spend_series in digital_channel_spend.items():
-        output[
-            f"spend_{channel_name}_pct_digital"
-        ] = safe_divide(
-            spend_series,
-            output[
-                "engineered_spend_digital"
-            ],
-        )
 
         output[
             f"spend_{channel_name}_pct_total"

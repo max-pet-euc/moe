@@ -60,7 +60,6 @@ feature_output_path = (
 wide_datasets = {
     "dates": DATASETS["dates"],
     "media": DATASETS["media"],
-    "external": DATASETS["external"],
     "funnel_uncohorted": DATASETS["funnel_uncohorted"],
     "funnel_cohorted": DATASETS["funnel_cohorted"],
 }
@@ -68,6 +67,7 @@ wide_datasets = {
 long_datasets = {
     "digital": DATASETS["digital"],
     "attribution": DATASETS["attribution"],
+    "external": DATASETS["external"],
 }
 
 
@@ -153,8 +153,6 @@ def pivot_metric_table(
 
     required_columns = {
         "date_day",
-        "platform",
-        "channel",
         "metric",
         "value",
     }
@@ -171,18 +169,33 @@ def pivot_metric_table(
 
     output = df.copy()
 
-    output["platform"] = output["platform"].map(_clean_name)
-    output["channel"] = output["channel"].map(_clean_name)
-    output["metric"] = output["metric"].map(_clean_name)
+    name_columns = [
+        column
+        for column in [
+            "platform",
+            "channel",
+            "metric",
+        ]
+        if column in output.columns
+    ]
+
+    for column in name_columns:
+        output[column] = (
+            output[column]
+            .map(_clean_name)
+        )
 
     output["feature_name"] = (
         prefix
         + "_"
-        + output["platform"]
-        + "_"
-        + output["channel"]
-        + "_"
-        + output["metric"]
+        + output[
+            name_columns
+        ]
+        .astype(str)
+        .agg(
+            "_".join,
+            axis=1,
+        )
     )
 
     output["value"] = pd.to_numeric(
@@ -351,7 +364,6 @@ def build_features(
 
     wide_prefixes = {
         "media": "",
-        "external": "external",
         "funnel_uncohorted": "uncohorted",
         "funnel_cohorted": "cohorted",
     }

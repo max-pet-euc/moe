@@ -29,7 +29,7 @@ CHANNEL_METRIC_GROUPS: dict[
     dict[str, str | None],
 ] = {
     "meta_bof": {
-        "sessions": "attribution_meta_meta_bof_last_click_sessions",
+        "sessions": None,
         "qs": "digital_meta_meta_bof_qs",
         "cp": "digital_meta_meta_bof_cp",
         "clicks": "digital_meta_meta_bof_clicks",
@@ -39,7 +39,7 @@ CHANNEL_METRIC_GROUPS: dict[
         "top_impressions": None,
     },
     "meta_mof": {
-        "sessions": "attribution_meta_meta_mof_last_click_sessions",
+        "sessions": None,
         "qs": "digital_meta_meta_mof_qs",
         "cp": "digital_meta_meta_mof_cp",
         "clicks": "digital_meta_meta_mof_clicks",
@@ -49,7 +49,7 @@ CHANNEL_METRIC_GROUPS: dict[
         "top_impressions": None,
     },
     "meta_tof": {
-        "sessions": "attribution_meta_meta_tof_last_click_sessions",
+        "sessions": None,
         "qs": "digital_meta_meta_tof_qs",
         "cp": "digital_meta_meta_tof_cp",
         "clicks": "digital_meta_meta_tof_clicks",
@@ -59,7 +59,7 @@ CHANNEL_METRIC_GROUPS: dict[
         "top_impressions": None,
     },
     "tiktok": {
-        "sessions": "attribution_tiktok_tiktok_paid_last_click_sessions",
+        "sessions": None,
         "qs": "digital_tiktok_tiktok_qs",
         "cp": "digital_tiktok_tiktok_cp",
         "clicks": "digital_tiktok_tiktok_clicks",
@@ -109,7 +109,7 @@ CHANNEL_METRIC_GROUPS: dict[
         "top_impressions": None,
     },
     "youtube": {
-        "sessions": "attribution_google_youtube_paid_last_click_sessions",
+        "sessions": None,
         "qs": "digital_google_youtube_qs",
         "cp": "digital_google_youtube_cp",
         "clicks": "digital_google_youtube_clicks",

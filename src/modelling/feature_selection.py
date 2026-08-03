@@ -11,6 +11,7 @@ import pandas as pd
 from config.settings import (
     ALWAYS_EXCLUDED_COLUMNS,
     CUSTOM_EXCLUDE_COLUMNS,
+    EXCLUDED_COLUMN_PREFIXES,
     FUNNEL_ORDER,
     MODEL_TARGETS,
 )
@@ -145,19 +146,33 @@ def select_features(
         | CUSTOM_EXCLUDE_COLUMNS
     )
 
+    prefix_excluded_columns = [
+        column
+        for column in model_df.columns
+        if any(
+            column.startswith(prefix)
+            for prefix in EXCLUDED_COLUMN_PREFIXES
+        )
+    ]
+
     candidate_columns = [
         column
         for column in model_df.columns
         if column not in configured_excluded_columns
+        and column not in prefix_excluded_columns
         and column != target_column
         and column not in leakage_columns
     ]
 
     numeric_feature_data = {}
+
     excluded_columns = [
         column
         for column in model_df.columns
-        if column in configured_excluded_columns
+        if (
+            column in configured_excluded_columns
+            or column in prefix_excluded_columns
+        )
     ]
 
     for column in candidate_columns:
