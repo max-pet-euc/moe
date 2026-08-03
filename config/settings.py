@@ -127,8 +127,8 @@ REPORT_OUTPUT_DIR = (
 #=========================================================
 #==reporting period
 
-REPORT_START_DATE = "2026-07-20"
-REPORT_END_DATE = "2026-07-26"
+REPORT_START_DATE = "2026-07-01"
+REPORT_END_DATE = "2026-07-31"
 
 REPORT_PERIOD_AGGREGATION = "sum"
 
