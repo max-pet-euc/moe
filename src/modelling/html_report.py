@@ -1528,7 +1528,7 @@ def build_model_report(
                 <div class="driver-name">{top_positive}</div>
             </div>
             <img class="chart" src="data:image/png;base64,{positive_driver_image}" alt="Positive model drivers">
-            <div class="table-wrapper">{dataframe_to_html(positive_driver_df[["feature", "previous_value", "current_value", "value_change", "model_expected_contribution", "proportional_actual_contribution"]], decimals=3)}</div>
+            <div class="table-wrapper">{dataframe_to_html(positive_driver_df[["feature", "previous_value", "current_value", "value_change", "model_expected_contribution"]], decimals=3)}</div>
         </div>
         <div class="card">
             <h2>Downward pressure</h2>
@@ -1537,7 +1537,7 @@ def build_model_report(
                 <div class="driver-name">{top_negative}</div>
             </div>
             <img class="chart" src="data:image/png;base64,{negative_driver_image}" alt="Negative model drivers">
-            <div class="table-wrapper">{dataframe_to_html(negative_driver_df[["feature", "previous_value", "current_value", "value_change", "model_expected_contribution", "proportional_actual_contribution"]], decimals=3)}</div>
+            <div class="table-wrapper">{dataframe_to_html(negative_driver_df[["feature", "previous_value", "current_value", "value_change", "model_expected_contribution"]], decimals=3)}</div>
         </div>
     </section>
 

@@ -782,20 +782,6 @@ def explain_period_change(
             / predicted_change
         )
 
-    if pd.isna(movement_scaling_factor):
-        proportional_actual_contribution = np.full(
-            shape=len(
-                model_expected_contribution
-            ),
-            fill_value=np.nan,
-            dtype=float,
-        )
-    else:
-        proportional_actual_contribution = (
-            model_expected_contribution
-            * movement_scaling_factor
-        )
-
     # Feature values are displayed as average daily values even when the
     # target and SHAP effects are summed across the reporting period.
     previous_feature_values = (
@@ -916,9 +902,6 @@ def explain_period_change(
             ),
             "model_expected_contribution": (
                 model_expected_contribution
-            ),
-            "proportional_actual_contribution": (
-                proportional_actual_contribution
             ),
             "current_value_percentile": (
                 current_feature_percentiles
