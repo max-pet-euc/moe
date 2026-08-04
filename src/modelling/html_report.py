@@ -328,13 +328,13 @@ def get_summary_text(
         baseline_text = (
             f"The model improves RMSE by "
             f"{rmse_improvement:.1f}% "
-            f"versus the mean baseline."
+            f"versus the mean baseline.\n"
         )
 
     else:
 
         baseline_text = (
-            "No baseline result was available."
+            "No baseline result was available.\n"
         )
 
     return (
@@ -345,7 +345,7 @@ def get_summary_text(
         f"{best_rmse:,.1f}, "
         f"an MAE of {best_mae:,.1f}, "
         f"and an R² of {best_r2:.3f}. "
-        f"{baseline_text}"
+        f"{baseline_text}\n"
     )
 
 def build_driver_chart(
@@ -675,31 +675,31 @@ def build_surprise_text(
     if movement_gap > 0:
         movement_text = (
             f"Actual {stage_label} movement was "
-            f"{abs(movement_gap):,.1f} better than expected."
+            f"{abs(movement_gap):,.1f} better than expected.\n"
         )
     elif movement_gap < 0:
         movement_text = (
             f"Actual {stage_label} movement was "
-            f"{abs(movement_gap):,.1f} worse than expected."
+            f"{abs(movement_gap):,.1f} worse than expected.\n"
         )
     else:
         movement_text = (
-            f"Actual {stage_label} movement matched expectation."
+            f"Actual {stage_label} movement matched expectation.\n"
         )
 
     if current_error > 0:
         level_text = (
             f"The current actual value finished "
-            f"{abs(current_error):,.1f} above the prediction."
+            f"{abs(current_error):,.1f} above the prediction.\n"
         )
     elif current_error < 0:
         level_text = (
             f"The current actual value finished "
-            f"{abs(current_error):,.1f} below the prediction."
+            f"{abs(current_error):,.1f} below the prediction.\n"
         )
     else:
         level_text = (
-            "The current actual value matched the prediction."
+            "The current actual value matched the prediction.\n"
         )
 
     investigation_text = (
@@ -806,31 +806,31 @@ def build_executive_story(
     if explanation_result.predicted_change > 0:
         predicted_text = (
             f"The model expected {stage_label} to rise by "
-            f"{abs(explanation_result.predicted_change):,.1f}."
+            f"{abs(explanation_result.predicted_change):,.1f}.\n"
         )
     elif explanation_result.predicted_change < 0:
         predicted_text = (
             f"The model expected {stage_label} to fall by "
-            f"{abs(explanation_result.predicted_change):,.1f}."
+            f"{abs(explanation_result.predicted_change):,.1f}.\n"
         )
     else:
         predicted_text = (
-            f"The model expected {stage_label} to remain unchanged."
+            f"The model expected {stage_label} to remain unchanged.\n"
         )
 
     if explanation_result.actual_change > 0:
         actual_text = (
             f"Actual {stage_label} rose by "
-            f"{abs(explanation_result.actual_change):,.1f}."
+            f"{abs(explanation_result.actual_change):,.1f}.\n"
         )
     elif explanation_result.actual_change < 0:
         actual_text = (
             f"Actual {stage_label} fell by "
-            f"{abs(explanation_result.actual_change):,.1f}."
+            f"{abs(explanation_result.actual_change):,.1f}.\n"
         )
     else:
         actual_text = (
-            f"Actual {stage_label} was unchanged."
+            f"Actual {stage_label} was unchanged.\n"
         )
 
     surprise_value = (
@@ -840,21 +840,21 @@ def build_executive_story(
     if surprise_value > 0:
         surprise_text = (
             f"Performance was {abs(surprise_value):,.1f} "
-            "better than the expected movement."
+            "better than the expected movement.\n"
         )
     elif surprise_value < 0:
         surprise_text = (
             f"Performance was {abs(surprise_value):,.1f} "
-            "worse than the expected movement."
+            "worse than the expected movement.\n"
         )
     else:
         surprise_text = (
-            "Performance matched the expected movement."
+            "Performance matched the expected movement.\n"
         )
 
     if opportunity_df.empty:
         lever_text = (
-            "No leading model lever was available."
+            "No leading model lever was available.\n"
         )
     else:
         leading_feature = str(
@@ -863,20 +863,20 @@ def build_executive_story(
 
         lever_text = (
             f"The leading model lever to review is "
-            f"{leading_feature}."
+            f"{leading_feature}.\n"
         )
 
     if np.isnan(
         reliability["score"]
     ):
         reliability_text = (
-            "Model reliability could not be calculated."
+            "Model reliability could not be calculated.\n"
         )
     else:
         reliability_text = (
             f"The heuristic reliability score is "
             f"{reliability['score']:.0f}/100 "
-            f"({reliability['label']})."
+            f"({reliability['label']}).\n"
         )
 
     return " ".join(
@@ -1324,7 +1324,7 @@ def build_model_report(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{model_stage.upper()} {model_grain.title()} Model Report v{REPORT_VERSION}</title>
+    <title>{model_stage.upper()} Predictive Model: Report v{REPORT_VERSION}</title>
     <style>
         :root {{
             --ink: #172033;
@@ -1453,8 +1453,8 @@ def build_model_report(
 <body>
 <div class="page">
     <section class="hero">
-        <div class="eyebrow">Marketing Optimisation Engine · Report v{REPORT_VERSION}</div>
-        <h1>{model_stage.upper()} Period Comparison</h1>
+        <div class="eyebrow">Report v{REPORT_VERSION}</div>
+        <h1>Marketing Optimisation Engine - {model_stage.upper()} Model</h1>
         <p class="period-label">
             {explanation_result.current_period}
             compared with
@@ -1497,11 +1497,6 @@ def build_model_report(
             {actual_change_pct_display}
             versus previous period
         </div>
-        <div class="metric-card">
-            <div class="metric-label">Reliability</div>
-            <div class="metric-value">{confidence_display}</div>
-            <div class="metric-sub">Heuristic historical score</div>
-        </div>
     </section>
 
     <section class="card">
@@ -1542,11 +1537,6 @@ def build_model_report(
     </section>
 
     <section class="grid-2">
-        <div class="card">
-            <h2>Biggest surprise</h2>
-            <p class="story">{surprise_text}</p>
-            <div class="table-wrapper">{dataframe_to_html(explanation_summary_df, decimals=2)}</div>
-        </div>
         <div class="card">
             <h2>How much should we trust this?</h2>
             <div class="metric-value">{confidence_display}</div>
