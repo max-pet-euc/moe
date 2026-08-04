@@ -41,33 +41,50 @@ class ScenarioStatus(StrEnum):
 
 @dataclass(frozen=True)
 class CommercialTargets:
-    """Commercial targets and approved total budget for one month."""
+    """Commercial targets and approved media budget."""
 
     date_month: pd.Timestamp
-    uncohorted_qs: float
-    uncohorted_op: float
-    budget_total: float
+    target_uncohorted_qs: float
+    target_uncohorted_op: float
+    target_budget_media: float
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self,
             "date_month",
-            pd.Timestamp(self.date_month).normalize(),
+            pd.Timestamp(
+                self.date_month
+            ).normalize(),
         )
-
 
 @dataclass(frozen=True)
 class GrowthBudgetPlan:
-    """Growth's channel-level budget allocation for one month."""
+    """Growth's monthly budget allocation."""
 
     date_month: pd.Timestamp
+    budget_total: float
+    budget_media: float
     channel_budgets: dict[str, float]
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self,
             "date_month",
-            pd.Timestamp(self.date_month).normalize(),
+            pd.Timestamp(
+                self.date_month
+            ).normalize(),
+        )
+
+        object.__setattr__(
+            self,
+            "budget_total",
+            float(self.budget_total),
+        )
+
+        object.__setattr__(
+            self,
+            "budget_media",
+            float(self.budget_media),
         )
 
         object.__setattr__(
@@ -75,18 +92,22 @@ class GrowthBudgetPlan:
             "channel_budgets",
             {
                 str(channel): float(value)
-                for channel, value in self.channel_budgets.items()
+                for channel, value
+                in self.channel_budgets.items()
             },
         )
 
     @property
-    def allocated_budget_total(self) -> float:
-        """Return the total budget allocated across all channels."""
+    def allocated_budget_total(
+        self,
+    ) -> float:
+        """Sum all detailed channel budgets."""
 
         return float(
-            sum(self.channel_budgets.values())
+            sum(
+                self.channel_budgets.values()
+            )
         )
-
 
 @dataclass
 class Scenario:
@@ -123,37 +144,66 @@ class Scenario:
 
     @property
     def budget_total(self) -> float:
-        """Approved Commercial budget."""
+        """Growth's stated total budget."""
 
         return float(
-            self.commercial_targets.budget_total
+            self.growth_budget_plan.budget_total
         )
 
+
     @property
-    def allocated_budget_total(self) -> float:
-        """Growth's allocated budget."""
+    def budget_media(self) -> float:
+        """Growth's stated media budget."""
+
+        return float(
+            self.growth_budget_plan.budget_media
+        )
+
+
+    @property
+    def target_budget_media(self) -> float:
+        """Commercial's approved media budget."""
+
+        return float(
+            self.commercial_targets
+            .target_budget_media
+        )
+
+
+    @property
+    def allocated_budget_total(
+        self,
+    ) -> float:
+        """Sum of detailed Growth budget lines."""
 
         return (
             self.growth_budget_plan
             .allocated_budget_total
         )
 
+
     @property
-    def budget_variance(self) -> float:
-        """Growth allocation minus approved Commercial budget."""
+    def budget_total_variance(
+        self,
+    ) -> float:
+        """Detailed allocation minus stated total."""
 
         return (
             self.allocated_budget_total
             - self.budget_total
         )
 
-    @property
-    def budget_reconciles(self) -> bool:
-        """Whether Growth's allocation exactly matches the approved budget."""
 
-        return abs(
-            self.budget_variance
-        ) < 0.01
+    @property
+    def media_target_variance(
+        self,
+    ) -> float:
+        """Growth media budget minus Commercial target."""
+
+        return (
+            self.budget_media
+            - self.target_budget_media
+        )
 
     def to_summary_dict(
         self,
@@ -167,19 +217,27 @@ class Scenario:
             "status": self.status.value,
             "date_month": self.date_month.date(),
             "days": self.days,
-            "uncohorted_qs_target": (
-                self.commercial_targets.uncohorted_qs
+            "target_uncohorted_qs": (
+                self.commercial_targets
+                .target_uncohorted_qs
             ),
-            "uncohorted_op_target": (
-                self.commercial_targets.uncohorted_op
+            "target_uncohorted_op": (
+                self.commercial_targets
+                .target_uncohorted_op
             ),
+            "target_budget_media": (
+                self.target_budget_media
+            ),
+            "budget_media": self.budget_media,
             "budget_total": self.budget_total,
             "allocated_budget_total": (
                 self.allocated_budget_total
             ),
-            "budget_variance": self.budget_variance,
-            "budget_reconciles": (
-                self.budget_reconciles
+            "budget_total_variance": (
+                self.budget_total_variance
+            ),
+            "media_target_variance": (
+                self.media_target_variance
             ),
             "created_at": self.created_at.isoformat(),
         }

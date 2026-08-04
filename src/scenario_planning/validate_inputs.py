@@ -55,9 +55,13 @@ BUDGET_TOLERANCE = 1.00
 
 REQUIRED_TARGET_COLUMNS = {
     "date_month",
-    "uncohorted_qs",
-    "uncohorted_op",
-    "budget_total",
+    "target_uncohorted_qs",
+    "target_uncohorted_op",
+    "target_budget_media",
+}
+
+NON_MEDIA_BUDGET_COLUMNS = {
+    "budget_creator",
 }
 
 
@@ -336,6 +340,25 @@ def validate_budgets(
             "one budget_* channel column"
         )
 
+    required_summary_columns = {
+        "budget_total",
+        "budget_media",
+    }
+
+    missing_summary_columns = sorted(
+        required_summary_columns.difference(
+            output.columns
+        )
+    )
+
+    if missing_summary_columns:
+        raise PlanningInputValidationError(
+            "budgets.csv is missing columns: "
+            + ", ".join(
+                missing_summary_columns
+            )
+        )
+
     invalid_budget_names = [
         column
         for column in budget_columns
@@ -370,11 +393,33 @@ def validate_budgets(
         budget_columns,
         "budgets.csv",
     )
+    
+    detail_budget_columns = [
+        column
+        for column in budget_columns
+        if column not in {
+            "budget_total",
+            "budget_media",
+        }
+    ]
+
+    media_budget_columns = [
+        column
+        for column in detail_budget_columns
+        if column
+        not in NON_MEDIA_BUDGET_COLUMNS
+    ]
 
     output[
         "allocated_budget_total"
     ] = output[
-        budget_columns
+        detail_budget_columns
+    ].sum(axis=1)
+
+    output[
+        "allocated_budget_media"
+    ] = output[
+        media_budget_columns
     ].sum(axis=1)
 
     warnings: list[str] = []
@@ -427,9 +472,9 @@ def validate_targets(
     output = validate_numeric_columns(
         output,
         [
-            "uncohorted_qs",
-            "uncohorted_op",
-            "budget_total",
+            "target_uncohorted_qs",
+            "target_uncohorted_op",
+            "target_budget_media",
         ],
         "targets.csv",
     )
@@ -437,8 +482,8 @@ def validate_targets(
     warnings: list[str] = []
 
     for column in [
-        "uncohorted_qs",
-        "uncohorted_op",
+        "target_uncohorted_qs",
+        "target_uncohorted_op",
     ]:
         zero_targets = output[
             column
@@ -516,20 +561,25 @@ def validate_budget_reconciliation(
     budgets: pd.DataFrame,
     targets: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Compare Growth allocation with Commercial's approved budget."""
+    """
+    Validate Growth totals and Commercial media alignment.
+    """
 
     comparison = (
         targets[
             [
                 "date_month",
-                "budget_total",
+                "target_budget_media",
             ]
         ]
         .merge(
             budgets[
                 [
                     "date_month",
+                    "budget_total",
+                    "budget_media",
                     "allocated_budget_total",
+                    "allocated_budget_media",
                 ]
             ],
             on="date_month",
@@ -539,7 +589,7 @@ def validate_budget_reconciliation(
     )
 
     comparison[
-        "budget_variance"
+        "budget_total_variance"
     ] = (
         comparison[
             "allocated_budget_total"
@@ -549,11 +599,39 @@ def validate_budget_reconciliation(
         ]
     )
 
+    comparison[
+        "budget_media_variance"
+    ] = (
+        comparison[
+            "allocated_budget_media"
+        ]
+        - comparison[
+            "budget_media"
+        ]
+    )
+
+    comparison[
+        "media_target_variance"
+    ] = (
+        comparison[
+            "budget_media"
+        ]
+        - comparison[
+            "target_budget_media"
+        ]
+    )
+
+    validation_columns = [
+        "budget_total_variance",
+        "budget_media_variance",
+        "media_target_variance",
+    ]
+
     failed = comparison[
-        "budget_variance"
+        validation_columns
     ].abs().gt(
         BUDGET_TOLERANCE
-    )
+    ).any(axis=1)
 
     if failed.any():
         details = (
@@ -561,9 +639,14 @@ def validate_budget_reconciliation(
                 failed,
                 [
                     "date_month",
+                    "target_budget_media",
+                    "budget_media",
+                    "allocated_budget_media",
                     "budget_total",
                     "allocated_budget_total",
-                    "budget_variance",
+                    "media_target_variance",
+                    "budget_media_variance",
+                    "budget_total_variance",
                 ],
             ]
             .assign(
@@ -571,15 +654,16 @@ def validate_budget_reconciliation(
                     frame[
                         "date_month"
                     ]
-                    .dt.strftime("%Y-%m-%d")
+                    .dt.strftime(
+                        "%Y-%m-%d"
+                    )
                 )
             )
             .to_string(index=False)
         )
 
         raise PlanningInputValidationError(
-            "Growth budget allocation does not "
-            "reconcile to Commercial budget_total "
+            "Planning budgets do not reconcile "
             f"within £{BUDGET_TOLERANCE:.2f}:\n\n"
             + details
         )
@@ -614,8 +698,10 @@ def build_scenarios(
         for column in budgets.columns
         if (
             column.startswith("budget_")
-            and column
-            != "budget_total"
+            and column not in {
+                "budget_total",
+                "budget_media",
+            }
         )
     ]
 
@@ -647,25 +733,23 @@ def build_scenarios(
             row_values["date_month"]
         )
 
-        commercial_targets = (
-            CommercialTargets(
-                date_month=date_month,
-                uncohorted_qs=float(
-                    row_values[
-                        "uncohorted_qs"
-                    ]
-                ),
-                uncohorted_op=float(
-                    row_values[
-                        "uncohorted_op"
-                    ]
-                ),
-                budget_total=float(
-                    row_values[
-                        "budget_total"
-                    ]
-                ),
-            )
+        commercial_targets = CommercialTargets(
+            date_month=date_month,
+            target_uncohorted_qs=float(
+                row_values[
+                    "target_uncohorted_qs"
+                ]
+            ),
+            target_uncohorted_op=float(
+                row_values[
+                    "target_uncohorted_op"
+                ]
+            ),
+            target_budget_media=float(
+                row_values[
+                    "target_budget_media"
+                ]
+            ),
         )
 
         channel_budgets = {
@@ -675,13 +759,15 @@ def build_scenarios(
             for column in budget_columns
         }
 
-        growth_budget_plan = (
-            GrowthBudgetPlan(
-                date_month=date_month,
-                channel_budgets=(
-                    channel_budgets
-                ),
-            )
+        growth_budget_plan = GrowthBudgetPlan(
+            date_month=date_month,
+            budget_total=float(
+                row_values["budget_total"]
+            ),
+            budget_media=float(
+                row_values["budget_media"]
+            ),
+            channel_budgets=channel_budgets,
         )
 
         scenario = Scenario(
@@ -779,12 +865,14 @@ def print_validation_summary(
     display_columns = [
         "scenario_id",
         "date_month",
-        "uncohorted_qs_target",
-        "uncohorted_op_target",
+        "target_uncohorted_qs",
+        "target_uncohorted_op",
+        "target_budget_media",
+        "budget_media",
+        "media_target_variance",
         "budget_total",
         "allocated_budget_total",
-        "budget_variance",
-        "budget_reconciles",
+        "budget_total_variance",
     ]
 
     print(
