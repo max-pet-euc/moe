@@ -117,25 +117,47 @@ class Scenario:
     scenario_name: str
     commercial_targets: CommercialTargets
     growth_budget_plan: GrowthBudgetPlan
-    scenario_type: ScenarioType = ScenarioType.MANUAL
-    status: ScenarioStatus = ScenarioStatus.DRAFT
+
+    scenario_type: ScenarioType = (
+        ScenarioType.MANUAL
+    )
+
+    status: ScenarioStatus = (
+        ScenarioStatus.DRAFT
+    )
+
+    flighting_profile: str = (
+        "standard_monthly"
+    )
+
     created_at: datetime = field(
         default_factory=lambda: datetime.now(
             timezone.utc
         )
     )
-    metadata: dict[str, str | float | int | bool] = field(
+
+    metadata: dict[
+        str,
+        str | float | int | bool,
+    ] = field(
         default_factory=dict
     )
 
     @property
-    def date_month(self) -> pd.Timestamp:
+    def date_month(
+        self,
+    ) -> pd.Timestamp:
         """Planning month represented by this scenario."""
 
-        return self.commercial_targets.date_month
+        return (
+            self.commercial_targets
+            .date_month
+        )
 
     @property
-    def days(self) -> int:
+    def days(
+        self,
+    ) -> int:
         """Number of calendar days in the planning month."""
 
         return int(
@@ -143,32 +165,37 @@ class Scenario:
         )
 
     @property
-    def budget_total(self) -> float:
+    def budget_total(
+        self,
+    ) -> float:
         """Growth's stated total budget."""
 
         return float(
-            self.growth_budget_plan.budget_total
+            self.growth_budget_plan
+            .budget_total
         )
 
-
     @property
-    def budget_media(self) -> float:
+    def budget_media(
+        self,
+    ) -> float:
         """Growth's stated media budget."""
 
         return float(
-            self.growth_budget_plan.budget_media
+            self.growth_budget_plan
+            .budget_media
         )
 
-
     @property
-    def target_budget_media(self) -> float:
+    def target_budget_media(
+        self,
+    ) -> float:
         """Commercial's approved media budget."""
 
         return float(
             self.commercial_targets
             .target_budget_media
         )
-
 
     @property
     def allocated_budget_total(
@@ -181,7 +208,6 @@ class Scenario:
             .allocated_budget_total
         )
 
-
     @property
     def budget_total_variance(
         self,
@@ -192,7 +218,6 @@ class Scenario:
             self.allocated_budget_total
             - self.budget_total
         )
-
 
     @property
     def media_target_variance(
@@ -211,12 +236,27 @@ class Scenario:
         """Return a flat scenario summary for CSV or reporting."""
 
         output: dict[str, object] = {
-            "scenario_id": self.scenario_id,
-            "scenario_name": self.scenario_name,
-            "scenario_type": self.scenario_type.value,
-            "status": self.status.value,
-            "date_month": self.date_month.date(),
-            "days": self.days,
+            "scenario_id": (
+                self.scenario_id
+            ),
+            "scenario_name": (
+                self.scenario_name
+            ),
+            "scenario_type": (
+                self.scenario_type.value
+            ),
+            "status": (
+                self.status.value
+            ),
+            "flighting_profile": (
+                self.flighting_profile
+            ),
+            "date_month": (
+                self.date_month.date()
+            ),
+            "days": (
+                self.days
+            ),
             "target_uncohorted_qs": (
                 self.commercial_targets
                 .target_uncohorted_qs
@@ -228,8 +268,12 @@ class Scenario:
             "target_budget_media": (
                 self.target_budget_media
             ),
-            "budget_media": self.budget_media,
-            "budget_total": self.budget_total,
+            "budget_media": (
+                self.budget_media
+            ),
+            "budget_total": (
+                self.budget_total
+            ),
             "allocated_budget_total": (
                 self.allocated_budget_total
             ),
@@ -239,17 +283,22 @@ class Scenario:
             "media_target_variance": (
                 self.media_target_variance
             ),
-            "created_at": self.created_at.isoformat(),
+            "created_at": (
+                self.created_at
+                .isoformat()
+            ),
         }
 
         output.update(
-            self.growth_budget_plan.channel_budgets
+            self.growth_budget_plan
+            .channel_budgets
         )
 
         output.update(
             {
                 f"metadata_{key}": value
-                for key, value in self.metadata.items()
+                for key, value
+                in self.metadata.items()
             }
         )
 

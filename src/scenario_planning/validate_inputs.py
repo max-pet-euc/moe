@@ -64,6 +64,18 @@ NON_MEDIA_BUDGET_COLUMNS = {
     "budget_creator",
 }
 
+FLIGHTING_PROFILES_PATH = (
+    PLANNING_INPUT_DIR
+    / "flighting_profiles.csv"
+)
+
+REQUIRED_FLIGHTING_COLUMNS = {
+    "profile_name",
+    "days_in_month",
+    "day_of_month",
+    "weight",
+}
+
 
 class PlanningInputValidationError(
     ValueError
@@ -77,6 +89,7 @@ class PlanningValidationResult:
 
     budgets: pd.DataFrame
     targets: pd.DataFrame
+    flighting_profiles: pd.DataFrame
     scenarios: list[Scenario]
     warnings: tuple[str, ...]
 
@@ -670,6 +683,159 @@ def validate_budget_reconciliation(
 
     return comparison
 
+def validate_flighting_profiles(
+    flighting_profiles: pd.DataFrame,
+) -> pd.DataFrame:
+    """Validate daily monthly flighting weights."""
+
+    validate_required_columns(
+        flighting_profiles,
+        REQUIRED_FLIGHTING_COLUMNS,
+        "flighting_profiles.csv",
+    )
+
+    output = flighting_profiles.copy()
+
+    output["profile_name"] = (
+        output["profile_name"]
+        .astype("string")
+        .str.strip()
+    )
+
+    output["days_in_month"] = pd.to_numeric(
+        output["days_in_month"],
+        errors="coerce",
+    )
+
+    output["day_of_month"] = pd.to_numeric(
+        output["day_of_month"],
+        errors="coerce",
+    )
+
+    output["weight"] = pd.to_numeric(
+        output["weight"],
+        errors="coerce",
+    )
+
+    if output[
+        [
+            "days_in_month",
+            "day_of_month",
+            "weight",
+        ]
+    ].isna().any().any():
+        raise PlanningInputValidationError(
+            "flighting_profiles.csv contains "
+            "non-numeric values"
+        )
+
+    invalid_days_in_month = (
+        ~output["days_in_month"]
+        .isin(
+            [28, 29, 30, 31]
+        )
+    )
+
+    if invalid_days_in_month.any():
+        raise PlanningInputValidationError(
+            "days_in_month must be one of "
+            "28, 29, 30 or 31"
+        )
+
+    invalid_day = (
+        output["day_of_month"].lt(1)
+        | output["day_of_month"].gt(
+            output["days_in_month"]
+        )
+    )
+
+    if invalid_day.any():
+        raise PlanningInputValidationError(
+            "day_of_month must fall within "
+            "days_in_month"
+        )
+
+    invalid_weight = (
+        output["weight"].lt(0)
+        | output["weight"].gt(1)
+    )
+
+    if invalid_weight.any():
+        raise PlanningInputValidationError(
+            "flighting weights must be "
+            "between 0 and 1"
+        )
+
+    duplicate_rows = output.duplicated(
+        subset=[
+            "profile_name",
+            "days_in_month",
+            "day_of_month",
+        ],
+        keep=False,
+    )
+
+    if duplicate_rows.any():
+        raise PlanningInputValidationError(
+            "duplicate flighting profile rows found"
+        )
+
+    profile_checks = (
+        output
+        .groupby(
+            [
+                "profile_name",
+                "days_in_month",
+            ],
+            as_index=False,
+        )
+        .agg(
+            row_count=(
+                "day_of_month",
+                "count",
+            ),
+            weight_total=(
+                "weight",
+                "sum",
+            ),
+        )
+    )
+
+    invalid_row_counts = (
+        profile_checks["row_count"]
+        != profile_checks["days_in_month"]
+    )
+
+    if invalid_row_counts.any():
+        raise PlanningInputValidationError(
+            "flighting profiles must contain "
+            "one row for every day"
+        )
+
+    invalid_weight_totals = (
+        profile_checks[
+            "weight_total"
+        ]
+        .sub(1.0)
+        .abs()
+        .gt(0.000001)
+    )
+
+    if invalid_weight_totals.any():
+        details = (
+            profile_checks.loc[
+                invalid_weight_totals
+            ]
+            .to_string(index=False)
+        )
+
+        raise PlanningInputValidationError(
+            "flighting profile weights must "
+            "sum to 1.0:\n\n"
+            + details
+        )
+
+    return output
 
 def make_scenario_id(
     date_month: pd.Timestamp,
@@ -839,9 +1005,18 @@ def load_and_validate_planning_inputs(
         targets,
     )
 
+    raw_flighting_profiles = load_csv_as_strings(
+        FLIGHTING_PROFILES_PATH
+    )
+
+    flighting_profiles = validate_flighting_profiles(
+        raw_flighting_profiles
+    )
+
     return PlanningValidationResult(
         budgets=budgets,
         targets=targets,
+        flighting_profiles=flighting_profiles,
         scenarios=scenarios,
         warnings=tuple(
             [
