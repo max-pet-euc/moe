@@ -133,8 +133,8 @@ REPORT_OUTPUT_DIR = (
 #=========================================================
 #==reporting period
 
-REPORT_START_DATE = "2026-07-01"
-REPORT_END_DATE = "2026-07-31"
+REPORT_START_DATE = "2026-08-03"
+REPORT_END_DATE = "2026-08-09"
 
 REPORT_PERIOD_AGGREGATION = "sum"
 
@@ -142,3 +142,9 @@ VALID_REPORT_PERIOD_AGGREGATIONS = {
     "sum",
     "mean",
 }
+
+# cd ~/moe
+# source .venv/bin/activate
+# python -m src.feature_pipeline.validate_data
+# python -m src.feature_pipeline.build_features
+# python -m src.modelling.train
