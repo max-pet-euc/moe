@@ -188,7 +188,6 @@ def add_channel_efficiency_features(
             (cost, impressions, f"{group_name}_cpm", 1000.0),
             (cost, clicks, f"{group_name}_cpc", 1.0),
             (cost, qs, f"{group_name}_cpqs", 1.0),
-            (cost, cp, f"{group_name}_cpcp", 1.0),
             (
                 impressions,
                 market_impressions,
