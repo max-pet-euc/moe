@@ -110,12 +110,12 @@ CUSTOM_EXCLUDE_COLUMNS = {
     "engineered_spend_digital",
     "engineered_spend_total",
     "spend_tv",
-    "engineered_spend_search",
-    "engineered_spend_meta",
 }
 
 EXCLUDED_COLUMN_PREFIXES = {
     "attribution_",
+    "engineered_spend_",
+    "spend_",
 }
 
 MODEL_OUTPUT_DIR = (
@@ -136,8 +136,8 @@ REPORT_OUTPUT_DIR = (
 #=========================================================
 #==reporting period
 
-REPORT_START_DATE = "2026-08-09"
-REPORT_END_DATE = "2026-08-15"
+REPORT_START_DATE = "2026-08-01"
+REPORT_END_DATE = "2026-08-31"
 
 REPORT_PERIOD_AGGREGATION = "sum"
 

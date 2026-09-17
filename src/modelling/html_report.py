@@ -5,8 +5,8 @@ Report v2 is deliberately executive-first: scorecard, movement story,
 waterfall, directional drivers, surprise, levers, then diagnostics.
 """
 
-REPORT_VERSION = "2.1-20260729"
-REPORT_FILENAME = "html_report_v2_20260729.py"
+REPORT_VERSION = "2.2-20260917"
+REPORT_FILENAME = "html_report_v2_2_20260917.py"
 
 from base64 import b64encode
 from io import BytesIO
@@ -1085,15 +1085,6 @@ def build_model_report(
         )
     )
 
-    waterfall_image = (
-        build_movement_waterfall_chart(
-            explanation_result=(
-                explanation_result
-            ),
-            top_n=8,
-        )
-    )
-
     model_summary = get_summary_text(
         comparison_df=comparison_df,
         best_model_name=best_model_name,
@@ -1129,11 +1120,6 @@ def build_model_report(
 
     unusualness_text = build_unusualness_text(
         explanation_result=explanation_result,
-    )
-
-    unusual_feature_df = build_unusual_feature_df(
-        contribution_df=explanation_result.contribution_df,
-        top_n=10,
     )
 
     explanation_summary_df = pd.DataFrame(
@@ -1460,7 +1446,6 @@ def build_model_report(
             compared with
             {explanation_result.previous_period}
         </p>
-        <p>{executive_story} {unusualness_text}</p>
     </section>
 
     <section class="scorecard">
@@ -1504,17 +1489,6 @@ def build_model_report(
         <p class="story">{explanation_result.summary}</p>
     </section>
 
-    <section class="card">
-        <h2>Why the model changed</h2>
-        <p class="section-intro">
-            The waterfall starts with the model's total prediction for
-            {explanation_result.previous_period}, adds the summed daily SHAP
-            contribution changes, and ends with the model's total prediction for
-            {explanation_result.current_period}.
-        </p>
-        <img class="chart" src="data:image/png;base64,{waterfall_image}" alt="Prediction movement waterfall">
-    </section>
-
     <section class="grid-2">
         <div class="card">
             <h2>Upward pressure</h2>
@@ -1544,24 +1518,11 @@ def build_model_report(
             <p class="note">This is a practical reliability indicator based on historical MAE relative to the typical actual value. It is not a probability and not a statistical confidence interval.</p>
             <div class="table-wrapper">{dataframe_to_html(reliability_df, decimals=2)}</div>
         </div>
-    </section>
-
-    <section class="card">
-        <h2>How unusual is this movement?</h2>
-        <p class="story">{unusualness_text}</p>
-        <p class="note">This ranks the absolute actual movement against all historical movements available in the prediction dataset.</p>
-    </section>
-
-    <section class="card">
-        <h2>Unusually high or low feature values</h2>
-        <p class="section-intro">Average daily feature values during the selected period compared with the historical reference distribution.</p>
-        <div class="table-wrapper">{dataframe_to_html(unusual_feature_df, decimals=2, max_rows=10)}</div>
-    </section>
-
-    <section class="card">
-        <h2>Priority levers to review</h2>
-        <p class="section-intro">This ranking combines global feature importance with how active each feature was in the selected predicted movement. It identifies where to investigate first; it does not prove causality or prescribe spend changes.</p>
-        <div class="table-wrapper">{dataframe_to_html(opportunity_df[["feature", "relative_importance", "stability", "previous_value", "current_value", "value_change", "model_expected_contribution", "latest_direction", "priority_score"]], decimals=3)}</div>
+        <div class="card">
+            <h2>How unusual is this movement?</h2>
+            <p class="story">{unusualness_text}</p>
+            <p class="note">This ranks the absolute actual movement against all historical movements available in the prediction dataset.</p>
+        </div>
     </section>
 
     <section class="card">
