@@ -1,42 +1,52 @@
-# MOE Hybrid v1.1 — isolated parallel model
+# MOE Hybrid v1.2
 
-**Does not modify or import the original MOE pipeline.** Only writes under `hybrid/outputs/`.
+This package is independent of the original MOE pipeline. It reads existing
+`data/raw/data_channel.csv`, `data/raw/data_constraints.csv`, and
+`data/raw/data_funnel.csv` without modifying them.
 
-## Run from MOE repository root
+## Run
+
+From the repository root:
 
 ```bash
 python -m pip install -r hybrid/requirements.txt
 python -m hybrid.run
 ```
 
-Open `hybrid/outputs/report.html`.
+## Settings
 
-## Real source inputs (already in your repository)
+In `hybrid/config/settings.json`:
 
-- `data/raw/data_channel.csv`: `country_code,brand,date_day,channel,spend_local,impressions,attributed_qs,minimum_qs_source,minimum_qs`
-- `data/raw/data_constraints.csv`: `channel,enabled,model_group,exposure_metric,minimum_source,minimum_multiplier,constraint_type,constraint_period,constraint_weight`
-- `data/raw/data_funnel.csv`: `brand,country_code,date_day,qs,cp,op`
+- `reporting.frequency`: `daily`, `weekly`, or `monthly`.
+- `constraints.frequency`: `daily`, `weekly`, or `monthly`.
+- Weekly periods begin Monday; monthly periods begin the first of the month.
+- Missing funnel actuals for channel days are excluded and audited, not replaced with zero.
+- Missing hard minimums are **errors**, not zeros.
+- Hard minimums are validated at the selected constraint frequency.
 
-No `problem_type` dimension is present. `qs` from `data_funnel.csv` is the actual target. `spend_local` is local currency and is **not** converted to GBP. `minimum_qs` is the last-click/business minimum and is not the platform conversion signal. `attributed_qs` can exceed actual QS in aggregate.
+The `constraint_period` field in the raw constraints file is not used to
+select frequency in v1.2; the global settings frequency applies to all
+channels. This avoids conflicting period definitions.
 
-The loader interprets `-` as missing, not zero. Configuration uses `minimum_source=minimum_qs` and `constraint_period=month` directly. `minimum_qs_source` is retained as source metadata; its values (`att`, `hdyhau`) do not change the floor rule.
+## Outputs
 
-## Output files
+All written under `hybrid/outputs/`:
 
-- `report.html`: separate country/brand tabs and monthly comparisons of attributed vs modelled QS and CPQS.
-- `channel_monthly.csv`: allocation and projected outcomes.
-- `excluded_channels.csv`: every unmapped/disabled channel and market lacking a funnel target, including excluded spend. **Review this before trusting totals.**
-- `validation_report.csv` and `floor_checks.csv`: validation diagnostics.
-- `features.csv`, `model_diagnostics_daily.csv`, `model_coefficients.csv`: model diagnostics.
+- `coverage_report.csv`: included/excluded row and spend coverage by market.
+- `excluded_channels.csv`: unmapped and daily target-missing exclusions.
+- `validation_report.csv` and `floor_checks.csv`: checks and hard-floor feasibility.
+- `features.csv`, `model_diagnostics_daily.csv`, `model_coefficients.csv`.
+- `channel_daily_modelled.csv`: daily constrained allocations.
+- `channel_report.csv`: aggregated to reporting frequency with CPQS and projections.
+- `report.html`: interactive market tabs and reporting periods.
 
-## Important constraints and limitations
+## Interpretation
 
-- Only configured and enabled channels with a matching funnel market are modelled. Unknown channels (e.g. `gifting`, `production`, `big_influencer`, blank channels) are **excluded and audited**, not assigned automatically. Likewise, channel markets with no matching funnel actuals are excluded and audited.
-- Monthly hard floors must sum to no more than monthly actual QS. Missing hard floor values are errors. The daily model uses both impressions (or spend, per configuration) and attributed QS as signals.
-- **The output is a historical constrained allocation, not causal incrementality.** Same-day attributed QS is downstream of advertising and may create target leakage for forecasting.
-- `projected_op` and `projected_cohorted_cac` still use configured *placeholder* funnel conversion rates unless `cohort_conversion_file` is provided. The current funnel contains uncohorted daily CP and OP, not cohort-specific rates; the model does not silently call these cohorted rates.
-- `model_group` is currently not used to combine channels; it is retained for a future model-grouping implementation.
-- Spend and CPQS/CAC are in **local market currency**, not a common currency.
-- Markets need at least `minimum_training_days` of funnel target data; adjust `hybrid/config/settings.json` only if appropriate.
+The model uses exposure and platform-attributed QS as two explanatory signals.
+It produces a **constrained historical QS contribution allocation**, not a
+causally identified estimate of incremental QS. Last-click floors are business
+constraints. Projected OP/CAC use placeholder conversion assumptions until
+actual cohort rates are connected. Cost values are in local currency.
 
-The original model can continue to be run independently. Its validator may need a separate compatibility adjustment if it scans all files in `data/raw/`; this package does not edit it.
+Reporting frequency and constraint frequency can differ. A weekly report
+under monthly constraints is not guaranteed to meet weekly floors.
