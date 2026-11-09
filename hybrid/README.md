@@ -50,3 +50,10 @@ actual cohort rates are connected. Cost values are in local currency.
 
 Reporting frequency and constraint frequency can differ. A weekly report
 under monthly constraints is not guaranteed to meet weekly floors.
+
+
+### v1.3: insufficient training history
+Markets with fewer than `minimum_training_days` target days are skipped rather than stopping the entire run.
+`outputs/market_status.csv` lists valid and invalid markets and the number of available days.
+The HTML report includes an **Invalid data** tab for each skipped market.
+Other markets continue to fit and allocate normally. Global validation errors still stop the run.

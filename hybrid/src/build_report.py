@@ -5,7 +5,7 @@ import pandas as pd
 def fmt(x):
     return '—' if pd.isna(x) else f'{x:,.2f}'
 
-def build_report(allocation:pd.DataFrame,path:Path,settings=None):
+def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=None):
     freq=(settings or {}).get('reporting',{}).get('frequency','weekly')
     tabs=[]
     if not allocation.empty:
@@ -22,6 +22,14 @@ def build_report(allocation:pd.DataFrame,path:Path,settings=None):
                 header=''.join(f'<th>{html.escape(h)}</th>' for h in heads)
                 sections.append(f'<section><h2>{html.escape(str(period.date()))}</h2><p>{summary}</p><div class="scroll"><table><thead><tr>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
             tabs.append((f'{country.upper()} · {brand}',''.join(sections)))
+    # Include invalid markets as explicit tabs; never fabricate model estimates.
+    if market_status is not None and not market_status.empty:
+        for _, item in market_status.loc[market_status['status'] != 'valid'].iterrows():
+            label=f"{str(item['country_code']).upper()} · {item['brand']}"
+            reason=html.escape(str(item['reason']))
+            tabs.append((label, f'<section><h2>Invalid data</h2><p>{reason}</p><p>No modelled QS, CPQS or CAC generated for this market.</p></section>'))
+    if not tabs:
+        tabs.append(('No eligible markets','<section><h2>No eligible markets</h2><p>Check market_status.csv and validation_report.csv.</p></section>'))
     buttons=''.join(f'<button onclick="show({i})">{html.escape(label)}</button>' for i,(label,_) in enumerate(tabs))
     panels=''.join(f'<div class="panel" id="panel{i}">{content}</div>' for i,(_,content) in enumerate(tabs))
     doc='''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MOE Hybrid</title><style>body{font:15px system-ui,Arial;margin:32px;background:#f7f8fa;color:#182333}h1{margin-bottom:4px}p{color:#526073}button{border:1px solid #ccd3dd;border-radius:8px;background:white;padding:10px;margin:4px;cursor:pointer}.panel{display:none}section{background:white;border:1px solid #e0e4ea;border-radius:12px;padding:18px;margin:18px 0}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{text-align:right;padding:11px;border-bottom:1px solid #e6e9ed}th:first-child,td:first-child{text-align:left}th{background:#f2f4f7}</style></head><body><h1>MOE Hybrid · QS contribution</h1>'''+f'<p>{html.escape(str(freq).title())} reporting · historical constrained allocation, not causal incrementality. Platform conversions may overlap; projections use configured assumptions.</p><nav>'+buttons+'</nav>'+panels+'''<script>function show(i){document.querySelectorAll('.panel').forEach((e,j)=>e.style.display=i===j?'block':'none')}show(0)</script></body></html>'''

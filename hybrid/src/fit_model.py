@@ -4,7 +4,7 @@ from sklearn.linear_model import Ridge
 
 
 def fit_markets(features, settings):
-    rows, coefficients = [], []
+    rows, coefficients, statuses = [], [], []
     group_cols = ['country_code','brand']
     for market, frame in features.groupby(group_cols, dropna=False):
         frame = frame.sort_values('date_day').copy()
@@ -13,8 +13,16 @@ def fit_markets(features, settings):
         cols = channel_cols + seasonal_cols
         x = frame[cols].fillna(0).to_numpy(dtype=float)
         y = frame['actual_qs'].to_numpy(dtype=float)
-        if len(frame) < settings['minimum_training_days']:
-            raise ValueError(f'{market}: only {len(frame)} target days, need {settings["minimum_training_days"]}')
+        minimum = int(settings['minimum_training_days'])
+        if len(frame) < minimum:
+            statuses.append({'country_code': market[0], 'brand': market[1],
+                             'status': 'invalid_data', 'valid_days': len(frame),
+                             'minimum_days': minimum,
+                             'reason': f'Invalid data — only {len(frame)} valid days (minimum {minimum} required)'})
+            continue
+        statuses.append({'country_code': market[0], 'brand': market[1],
+                         'status': 'valid', 'valid_days': len(frame),
+                         'minimum_days': minimum, 'reason': ''})
         # Nonnegative coefficients on exposure and attributed QS; seasonal terms
         # are unconstrained via split positive/negative basis (Ridge positive=True).
         xc = x[:, :len(channel_cols)]
@@ -36,4 +44,4 @@ def fit_markets(features, settings):
             rows.append(record)
         for col, val in zip(channel_cols,coefs):
             coefficients.append(dict(zip(group_cols,market), feature=col, coefficient=float(val)))
-    return pd.DataFrame(rows), pd.DataFrame(coefficients)
+    return pd.DataFrame(rows), pd.DataFrame(coefficients), pd.DataFrame(statuses)
