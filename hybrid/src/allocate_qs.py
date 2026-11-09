@@ -1,11 +1,85 @@
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import linprog
 from .periods import frequency, period_start
 from .load_data import MARKET, KEYS
 
 
 def _sum_nullable(x): return x.sum(min_count=1)
+
+def _weighted_projection(desired, lower, weights, total):
+    """Exact weighted least-squares projection onto a simplex with lower bounds.
+
+    Minimises sum(weights * (x - desired)^2), with x >= lower and sum(x)=total.
+    Bisection on the KKT multiplier avoids fragile SLSQP line searches.
+    """
+    desired=np.asarray(desired,dtype=float)
+    lower=np.asarray(lower,dtype=float)
+    weights=np.asarray(weights,dtype=float)
+    if not (np.isfinite(desired).all() and np.isfinite(lower).all() and np.isfinite(weights).all()):
+        raise ValueError('non-finite inputs to QS allocation')
+    if (weights<=0).any() or (lower<0).any() or total<0:
+        raise ValueError('invalid allocation weights, floors or total')
+    if lower.sum()>total+1e-6:
+        raise ValueError(f'infeasible hard floors: {lower.sum()} > {total}')
+    if total-lower.sum()<=1e-9:
+        return lower.copy()
+    # x_i = max(lower_i, desired_i - lambda/(2*weight_i))
+    def at(lam):
+        return np.maximum(lower,desired-lam/(2*weights))
+    lo=-1.0
+    hi=1.0
+    for _ in range(200):
+        if at(lo).sum()>=total:break
+        lo*=2
+    for _ in range(200):
+        if at(hi).sum()<=total:break
+        hi*=2
+    for _ in range(160):
+        mid=(lo+hi)/2
+        if at(mid).sum()>total:lo=mid
+        else:hi=mid
+    x=at((lo+hi)/2)
+    # Correct floating point residual without breaching floors.
+    residual=total-x.sum()
+    if residual>0:
+        x[np.argmax(weights)]+=residual
+    elif residual<0:
+        slack=x-lower
+        idx=np.argmax(slack)
+        if slack[idx]>=-residual-1e-7:x[idx]+=residual
+    if abs(x.sum()-total)>1e-5 or (x<lower-1e-5).any():
+        raise RuntimeError('numerical reconciliation failed in weighted projection')
+    return x
+
+
+def _daily_transport(desired, row_totals, column_totals):
+    """Reconcile channel-period totals to daily actual QS with nonnegative entries."""
+    d,k=desired.shape
+    if not np.isclose(row_totals.sum(),column_totals.sum(),atol=1e-5):
+        raise ValueError('daily and channel totals do not reconcile')
+    if row_totals.sum()<=1e-12:return np.zeros_like(desired)
+    matrix=np.maximum(desired,0)+1e-6
+    # Sinkhorn / iterative proportional fitting; positive seed supports all cells.
+    for _ in range(3000):
+        col_sum=matrix.sum(axis=0)
+        matrix*=np.divide(column_totals,col_sum,out=np.zeros_like(column_totals),where=col_sum>0)[None,:]
+        row_sum=matrix.sum(axis=1)
+        matrix*=np.divide(row_totals,row_sum,out=np.zeros_like(row_totals),where=row_sum>0)[:,None]
+        if (np.max(np.abs(matrix.sum(axis=0)-column_totals))<1e-5 and
+                np.max(np.abs(matrix.sum(axis=1)-row_totals))<1e-5):
+            return matrix
+    # Feasible transportation LP fallback (no nonlinear optimisation).
+    from scipy.sparse import lil_matrix
+    A=lil_matrix((d+k,d*k),dtype=float)
+    for i in range(d):A[i,i*k:(i+1)*k]=1
+    for j in range(k):A[d+j,j::k]=1
+    b=np.r_[row_totals,column_totals]
+    res=linprog(np.zeros(d*k),A_eq=A.tocsr(),b_eq=b,bounds=(0,None),method='highs')
+    if not res.success:
+        raise RuntimeError(f'daily transportation reconciliation failed: {res.message}')
+    return res.x.reshape(d,k)
+
 
 def allocate_periods(channels,constraints,targets,fit_daily,settings):
     """Fit a constrained allocation per period, then distribute each channel across days.
@@ -60,29 +134,10 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
         desired_totals=desired.sum(axis=0)
         lower=np.r_[floor,0.]
         weights=np.r_[np.ones(n)*float(settings.get('channel_signal_weight',1)),float(settings.get('baseline_weight',0.5))]
-        x0=lower.copy();x0[-1]+=total-lower.sum()
-        def obj(x):return float(np.sum(weights*(x-desired_totals)**2))
-        result=minimize(obj,x0,method='SLSQP',bounds=[(float(v),None) for v in lower],constraints=[{'type':'eq','fun':lambda x:float(np.sum(x)-total)}],options={'maxiter':1500,'ftol':1e-8})
-        if not result.success or np.any(result.x<lower-1e-4) or abs(result.x.sum()-total)>1e-4:
-            raise RuntimeError(f'QS allocation failed for {market_period}: {result.message}')
-        # Distribute period totals to days with iterative proportional fitting.
-        # A tiny positive prior allows floors to be distributed across all observed days.
-        matrix=desired+1e-7
-        col_target=np.maximum(result.x,0)
-        for _ in range(1500):
-            col_sums=matrix.sum(axis=0)
-            matrix*=np.divide(col_target,col_sums,out=np.zeros_like(col_target),where=col_sums>0)[None,:]
-            row_sums=matrix.sum(axis=1)
-            matrix*=np.divide(actual_vec,row_sums,out=np.zeros_like(actual_vec),where=row_sums>0)[:,None]
-            if np.max(np.abs(matrix.sum(axis=0)-col_target))<1e-5 and np.max(np.abs(matrix.sum(axis=1)-actual_vec))<1e-5: break
-        if np.max(np.abs(matrix.sum(axis=0)-col_target))>1e-3:
-            # More robust fallback: constrained joint optimisation for rare difficult periods.
-            flat=matrix.ravel()
-            row_constraints=[{'type':'eq','fun':lambda x,j=j:np.sum(x.reshape(d,n+1)[j,:])-actual_vec[j]} for j in range(d)]
-            col_constraints=[{'type':'eq','fun':lambda x,i=i:np.sum(x.reshape(d,n+1)[:,i])-col_target[i]} for i in range(n)]
-            opt=minimize(lambda x:float(np.sum((x-flat)**2)),flat,method='SLSQP',bounds=[(0,None)]*len(flat),constraints=row_constraints+col_constraints,options={'maxiter':1500,'ftol':1e-7})
-            if not opt.success: raise RuntimeError(f'daily reconciliation failed for {market_period}: {opt.message}')
-            matrix=opt.x.reshape(d,n+1)
+        col_target=_weighted_projection(desired_totals,lower,weights,total)
+        matrix=_daily_transport(desired,actual_vec,col_target)
+        if np.max(np.abs(matrix.sum(axis=0)-col_target))>1e-3 or np.max(np.abs(matrix.sum(axis=1)-actual_vec))>1e-3:
+            raise RuntimeError(f'daily reconciliation tolerance exceeded for {market_period}')
         lookup=sub.set_index(['date_day','channel'])
         for j,day in enumerate(days):
             for i,name in enumerate(names):
