@@ -12,6 +12,7 @@ from config.settings import (
     ALWAYS_EXCLUDED_COLUMNS,
     CUSTOM_EXCLUDE_COLUMNS,
     EXCLUDED_COLUMN_PREFIXES,
+    EXCLUDED_COLUMN_SUFFIXES,
     FUNNEL_ORDER,
     MODEL_TARGETS,
 )
@@ -155,11 +156,21 @@ def select_features(
         )
     ]
 
+    suffix_excluded_columns = [
+        column
+        for column in model_df.columns
+        if any(
+            column.endswith(suffix)
+            for suffix in EXCLUDED_COLUMN_SUFFIXES
+        )
+    ]
+
     candidate_columns = [
         column
         for column in model_df.columns
         if column not in configured_excluded_columns
         and column not in prefix_excluded_columns
+        and column not in suffix_excluded_columns
         and column != target_column
         and column not in leakage_columns
     ]
@@ -172,6 +183,7 @@ def select_features(
         if (
             column in configured_excluded_columns
             or column in prefix_excluded_columns
+            or column in suffix_excluded_columns
         )
     ]
 

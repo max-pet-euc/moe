@@ -99,6 +99,7 @@ ALWAYS_EXCLUDED_COLUMNS = {
 CUSTOM_EXCLUDE_COLUMNS = {
     # raw spend columns replaced by engineered features
     "spend_meta",
+    "spend_display"
     "spend_tiktok",
     "spend_search_brand",
     "spend_search_nb",
@@ -107,15 +108,35 @@ CUSTOM_EXCLUDE_COLUMNS = {
     "spend_search_bing",
     "spend_search_youtube",
     "spend_reddit",
-    "engineered_spend_digital",
-    "engineered_spend_total",
-    "spend_tv",
+    # "spend_tv",
+    "spend_other",
+    "engineered_spend_youtube",
 }
 
 EXCLUDED_COLUMN_PREFIXES = {
     "attribution_",
-    "engineered_spend_",
-    "spend_",
+    "digital_meta_meta",
+    "digital_reddit",
+    # "meta_mof",
+    # "spend_",
+    # "engineered_spend_",
+    # "external_top_",
+    # "attribution_crm",
+    # "attribution_other",
+    # "attribution_meta_meta_",
+}
+
+EXCLUDED_COLUMN_SUFFIXES = {
+    # "last_click_qs",
+    "_total",
+    "_spend",
+    "_cpc",
+    "_ctr",
+    "_cpi",
+    "_cpm",
+    "_cpqs",
+    "_impressions",
+    "_clicks",
 }
 
 MODEL_OUTPUT_DIR = (
@@ -136,8 +157,8 @@ REPORT_OUTPUT_DIR = (
 #=========================================================
 #==reporting period
 
-REPORT_START_DATE = "2026-08-01"
-REPORT_END_DATE = "2026-08-31"
+REPORT_START_DATE = "2026-10-01"
+REPORT_END_DATE = "2026-10-31"
 
 REPORT_PERIOD_AGGREGATION = "sum"
 
