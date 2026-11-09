@@ -92,7 +92,9 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
     ch=ch.loc[ch['enabled']].copy()
     ch['period_start']=period_start(ch['date_day'],cf)
     hard=ch['constraint_type'].eq('hard') & ch['minimum_source'].eq('minimum_qs')
-    ch['floor']=np.where(hard,ch['last_click_qs'].fillna(0)*ch['minimum_multiplier'],0.)
+    tolerance=float(settings.get('minimum_qs_tolerance',0.10))
+    if not 0 <= tolerance < 1: raise ValueError('minimum_qs_tolerance must be in [0,1)')
+    ch['floor']=np.where(hard,ch['last_click_qs'].fillna(0)*ch['minimum_multiplier']*(1-tolerance),0.)
     t=targets.copy();t['period_start']=period_start(t['date_day'],cf)
     f=fit_daily.copy()
     # Raw model signal by channel/day: sum both exposure and attribution components.

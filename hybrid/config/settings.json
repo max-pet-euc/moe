@@ -27,5 +27,6 @@
   "validation": {
     "missing_actuals": "exclude_and_warn",
     "minimum_exceeds_actuals": "error"
-  }
+  },
+  "minimum_qs_tolerance": 0.1
 }
