@@ -1,0 +1,19 @@
+{
+  "channel_file": "data/raw/channel_daily.csv",
+  "constraint_file": "data/raw/channel_constraints.csv",
+  "target_file": "data/raw/data_targets.csv",
+  "target_date_column": "date_day",
+  "target_qs_column": "qs",
+  "target_filters": {},
+  "report_frequency": "MS",
+  "ridge_alpha": 100.0,
+  "minimum_training_days": 28,
+  "baseline_prior_share": 0.15,
+  "baseline_weight": 0.5,
+  "channel_signal_weight": 1.0,
+  "default_qs_to_cp": 0.1,
+  "default_cp_to_op": 0.5,
+  "default_qs_to_op": null,
+  "cohort_conversion_file": null,
+  "strict_validation": true
+}
