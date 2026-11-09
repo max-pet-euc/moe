@@ -2,7 +2,7 @@
 from pathlib import Path
 import pandas as pd
 from .src.load_data import load_settings,load_inputs
-from .src.validate_data import validate
+from .src.validate_data import validate, prepare
 from .src.build_features import build_features
 from .src.fit_model import fit_markets
 from .src.allocate_qs import allocate_monthly
@@ -15,6 +15,10 @@ def main():
     settings=load_settings(root)
     out=root/'hybrid/outputs'; out.mkdir(parents=True,exist_ok=True)
     channels,constraints,targets=load_inputs(root,settings)
+    channels,targets,excluded=prepare(channels,constraints,targets,settings)
+    excluded.to_csv(out/'excluded_channels.csv',index=False)
+    if not excluded.empty:
+        print(f'WARNING: {int(excluded["rows"].sum())} channel rows excluded; see hybrid/outputs/excluded_channels.csv')
     errors,warnings,checks=validate(channels,constraints,targets)
     pd.DataFrame([{'level':'error','message':v} for v in errors]+[{'level':'warning','message':v} for v in warnings],columns=['level','message']).to_csv(out/'validation_report.csv',index=False)
     checks.to_csv(out/'floor_checks.csv',index=False)

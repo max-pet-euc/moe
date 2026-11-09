@@ -1,6 +1,6 @@
 import pandas as pd
 
-GROUP=['country_code','brand','problem_type']
+GROUP=['country_code','brand']
 
 def project_outcomes(allocation, settings, root):
     if allocation.empty: return allocation

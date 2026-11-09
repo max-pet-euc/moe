@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-GROUP = ['country_code','brand','problem_type']
+GROUP = ['country_code','brand']
 
 
 def allocate_monthly(channels, constraints, targets, fit_daily, settings):
     ch = channels.merge(constraints[['channel','enabled','minimum_source','minimum_multiplier','constraint_type']], on='channel', how='inner')
     ch = ch.loc[ch['enabled']].copy()
     ch['month'] = ch['date_day'].dt.to_period('M').astype(str)
-    ch['floor'] = np.where((ch['constraint_type'] == 'hard') & (ch['minimum_source'] == 'last_click_qs'),ch['last_click_qs'].fillna(0)*ch['minimum_multiplier'],0)
+    ch['floor'] = np.where((ch['constraint_type'] == 'hard') & (ch['minimum_source'] == 'minimum_qs'),ch['last_click_qs'].fillna(0)*ch['minimum_multiplier'],0)
     t = targets.copy(); t['month'] = t['date_day'].dt.to_period('M').astype(str)
     f = fit_daily.copy(); f['month'] = f['date_day'].dt.to_period('M').astype(str)
     actual = t.groupby(GROUP+['month'],as_index=False)['actual_qs'].sum()

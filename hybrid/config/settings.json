@@ -1,7 +1,7 @@
 {
-  "channel_file": "data/raw/channel_daily.csv",
-  "constraint_file": "data/raw/channel_constraints.csv",
-  "target_file": "data/raw/data_targets.csv",
+  "channel_file": "data/raw/data_channel.csv",
+  "constraint_file": "data/raw/data_constraints.csv",
+  "target_file": "data/raw/data_funnel.csv",
   "target_date_column": "date_day",
   "target_qs_column": "qs",
   "target_filters": {},
@@ -15,5 +15,7 @@
   "default_cp_to_op": 0.5,
   "default_qs_to_op": null,
   "cohort_conversion_file": null,
-  "strict_validation": true
+  "strict_validation": true,
+  "unmapped_channel_policy": "exclude_with_report",
+  "missing_target_market_policy": "exclude_with_report"
 }

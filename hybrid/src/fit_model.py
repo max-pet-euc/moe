@@ -5,7 +5,7 @@ from sklearn.linear_model import Ridge
 
 def fit_markets(features, settings):
     rows, coefficients = [], []
-    group_cols = ['country_code','brand','problem_type']
+    group_cols = ['country_code','brand']
     for market, frame in features.groupby(group_cols, dropna=False):
         frame = frame.sort_values('date_day').copy()
         channel_cols = sorted(c for c in frame if c.startswith(('exposure_signal__','attributed_signal__')))

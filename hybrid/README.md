@@ -1,47 +1,42 @@
-# MOE Hybrid v1 (independent prototype)
+# MOE Hybrid v1.1 — isolated parallel model
 
-This is an additive, non-destructive prototype. It does not import or edit the original `src/` modules and writes exclusively to `hybrid/outputs/`.
+**Does not modify or import the original MOE pipeline.** Only writes under `hybrid/outputs/`.
 
-## Installation and run
-
-From the **MOE repository root**:
+## Run from MOE repository root
 
 ```bash
 python -m pip install -r hybrid/requirements.txt
 python -m hybrid.run
 ```
 
-Open `hybrid/outputs/report.html` in a browser.
+Open `hybrid/outputs/report.html`.
 
-## Inputs
+## Real source inputs (already in your repository)
 
-Configure file names in `hybrid/config/settings.json`. Defaults assume:
+- `data/raw/data_channel.csv`: `country_code,brand,date_day,channel,spend_local,impressions,attributed_qs,minimum_qs_source,minimum_qs`
+- `data/raw/data_constraints.csv`: `channel,enabled,model_group,exposure_metric,minimum_source,minimum_multiplier,constraint_type,constraint_period,constraint_weight`
+- `data/raw/data_funnel.csv`: `brand,country_code,date_day,qs,cp,op`
 
-- `data/raw/channel_daily.csv`: `date_day,country_code,brand,problem_type,channel,spend,impressions,attributed_qs,last_click_qs`
-- `data/raw/channel_constraints.csv`: `channel,exposure_metric,minimum_source,minimum_multiplier,constraint_type,enabled,model_group,constraint_period,constraint_weight`
-- `data/raw/data_targets.csv`: `date_day,country_code,brand,problem_type,qs` **(target schema must be verified)**
+No `problem_type` dimension is present. `qs` from `data_funnel.csv` is the actual target. `spend_local` is local currency and is **not** converted to GBP. `minimum_qs` is the last-click/business minimum and is not the platform conversion signal. `attributed_qs` can exceed actual QS in aggregate.
 
-If your new raw files use different names, update settings rather than renaming existing data. `impressions` and `attributed_qs` are retained as separate model features; the configured exposure source selects impressions or spend for each channel. Both may exceed or be absent independently. Missing signal values are flagged as missing and currently imputed to zero for model fitting; this should be refined once actual data coverage is inspected.
+The loader interprets `-` as missing, not zero. Configuration uses `minimum_source=minimum_qs` and `constraint_period=month` directly. `minimum_qs_source` is retained as source metadata; its values (`att`, `hdyhau`) do not change the floor rule.
 
-## What it does
+## Output files
 
-1. Reads new channel data and existing daily actual QS targets.
-2. Validates uniqueness, nonnegative values, channel mapping, and **monthly** last-click floor <= actual QS for each market.
-3. Fits independent per-market positive Ridge models using log impressions/spend and log attributed QS, plus basic time controls.
-4. Calculates nonnegative channel evidence from the fitted coefficients.
-5. Solves a constrained monthly allocation that reconciles channel QS + baseline to actual QS and enforces last-click floors.
-6. Produces platform CPQS, modelled CPQS, projected CP/OP/CAC, and separate HTML tabs per market.
+- `report.html`: separate country/brand tabs and monthly comparisons of attributed vs modelled QS and CPQS.
+- `channel_monthly.csv`: allocation and projected outcomes.
+- `excluded_channels.csv`: every unmapped/disabled channel and market lacking a funnel target, including excluded spend. **Review this before trusting totals.**
+- `validation_report.csv` and `floor_checks.csv`: validation diagnostics.
+- `features.csv`, `model_diagnostics_daily.csv`, `model_coefficients.csv`: model diagnostics.
 
-## Critical interpretation
+## Important constraints and limitations
 
-- **The fitted model is associative, not causal.** Contemporaneous attributed QS is partly an outcome and creates leakage for forward-looking budget scenarios. This version must **not** be used to claim incrementality or optimise spend.
-- **The monthly allocation is a reconciliation step**, not the raw Ridge prediction. Last-click is a configurable *business floor*, not a causal floor.
-- `model_group` is preserved but **not yet implemented as an aggregation**. Channel models are currently individual.
-- Daily channel-level contributions are not reconciled. Monthly channel contributions are.
-- `constraint_weight` is reserved for future soft constraints; v1 supports hard or none.
-- Conversion assumptions are placeholders until actual cohort rates are supplied. Projected CAC is spend / projected OP; it is not observed CAC.
-- The code intentionally has no write operations outside `hybrid/outputs/`.
+- Only configured and enabled channels with a matching funnel market are modelled. Unknown channels (e.g. `gifting`, `production`, `big_influencer`, blank channels) are **excluded and audited**, not assigned automatically. Likewise, channel markets with no matching funnel actuals are excluded and audited.
+- Monthly hard floors must sum to no more than monthly actual QS. Missing hard floor values are errors. The daily model uses both impressions (or spend, per configuration) and attributed QS as signals.
+- **The output is a historical constrained allocation, not causal incrementality.** Same-day attributed QS is downstream of advertising and may create target leakage for forecasting.
+- `projected_op` and `projected_cohorted_cac` still use configured *placeholder* funnel conversion rates unless `cohort_conversion_file` is provided. The current funnel contains uncohorted daily CP and OP, not cohort-specific rates; the model does not silently call these cohorted rates.
+- `model_group` is currently not used to combine channels; it is retained for a future model-grouping implementation.
+- Spend and CPQS/CAC are in **local market currency**, not a common currency.
+- Markets need at least `minimum_training_days` of funnel target data; adjust `hybrid/config/settings.json` only if appropriate.
 
-## Next steps before production
-
-Verify raw CSV schemas and target grain, compare with the original model, add train/test backtesting, tune baseline allocation, model lags and saturation, and build a distinct causal response model for incremental QS. Do not treat the current report as a validated marketing effectiveness estimate.
+The original model can continue to be run independently. Its validator may need a separate compatibility adjustment if it scans all files in `data/raw/`; this package does not edit it.
