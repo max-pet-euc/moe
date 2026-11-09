@@ -11,7 +11,11 @@ def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=N
     if not allocation.empty:
         for (country,brand),group in allocation.groupby(['country_code','brand']):
             sections=[]
-            for period,sub in group.groupby('period_start',sort=True):
+            # Display only the three latest periods per market, newest first.
+            # Keep the underlying allocation and CSV exports at full history.
+            latest_periods = sorted(group['period_start'].dropna().unique(), reverse=True)[:3]
+            for period in latest_periods:
+                sub = group.loc[group['period_start'] == period]
                 sub=sub.sort_values('modelled_qs',ascending=False)
                 rows=[]
                 for _,r in sub.iterrows():
