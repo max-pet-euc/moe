@@ -91,10 +91,10 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
     ch=channels.merge(constraints[['channel','enabled','minimum_source','minimum_multiplier','constraint_type']],on='channel',how='inner')
     ch=ch.loc[ch['enabled']].copy()
     ch['period_start']=period_start(ch['date_day'],cf)
-    hard=ch['constraint_type'].eq('hard') & ch['minimum_source'].eq('minimum_qs')
+    hard=ch['constraint_type'].eq('hard') & ch['minimum_source'].ne('none')
     tolerance=float(settings.get('minimum_qs_tolerance',0.10))
     if not 0 <= tolerance < 1: raise ValueError('minimum_qs_tolerance must be in [0,1)')
-    ch['floor']=np.where(hard,ch['last_click_qs'].fillna(0)*ch['minimum_multiplier']*(1-tolerance),0.)
+    ch['floor']=np.where(hard,ch['minimum_qs'].fillna(0)*ch['minimum_multiplier']*(1-tolerance),0.)
     t=targets.copy();t['period_start']=period_start(t['date_day'],cf)
     f=fit_daily.copy()
     # Raw model signal by channel/day: sum both exposure and attribution components.
@@ -148,7 +148,7 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
                 if isinstance(row,pd.DataFrame): row=row.iloc[0]
                 records.append({'date_day':day,'country_code':country,'brand':brand,'constraint_period_start':start,
                     'channel':name,'spend':row['spend'],'attributed_qs':row['attributed_qs'],
-                    'last_click_qs':row['last_click_qs'],'floor':row['floor'],
+                    'minimum_qs':row['minimum_qs'],'minimum_qs_source':row['minimum_qs_source'],'floor':row['floor'],
                     'modelled_qs':float(matrix[j,i]),'actual_qs':float(actual_vec[j]),
                     'baseline_qs':float(matrix[j,-1]),'raw_model_signal':float(row['raw_signal'])})
     out=pd.DataFrame(records)
@@ -168,7 +168,7 @@ def aggregate_reporting(daily,settings):
     totals=day_actual.groupby(keys,as_index=False).agg(actual_qs=('actual_qs','sum'),baseline_qs=('baseline_qs','sum'))
     grouped=df.groupby(keys+['channel'],as_index=False).agg(
         spend=('spend',_sum_nullable),attributed_qs=('attributed_qs',_sum_nullable),
-        last_click_qs=('last_click_qs',_sum_nullable),floor=('floor','sum'),
+        minimum_qs=('minimum_qs',_sum_nullable),minimum_qs_source=('minimum_qs_source',lambda x: ', '.join(sorted(x.dropna().astype(str).unique()))),floor=('floor','sum'),
         modelled_qs=('modelled_qs','sum'),raw_model_signal=('raw_model_signal','sum'))
     grouped=grouped.merge(totals,on=keys,how='left')
     grouped['platform_cpqs']=grouped['spend']/grouped['attributed_qs'].replace(0,np.nan)

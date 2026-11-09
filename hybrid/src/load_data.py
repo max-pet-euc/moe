@@ -5,7 +5,7 @@ import pandas as pd
 # Source files have no problem_type dimension; never manufacture one.
 KEYS = ['date_day', 'country_code', 'brand']
 MARKET = ['country_code', 'brand']
-METRICS = ['spend', 'impressions', 'attributed_qs', 'last_click_qs']
+METRICS = ['spend', 'impressions', 'attributed_qs', 'minimum_qs']
 NA = ['', '-', '—', 'null', 'none', 'nan', 'n/a']
 
 
@@ -24,14 +24,15 @@ def load_inputs(root: Path, settings: dict):
     for col in KEYS + ['channel', 'spend_local', 'impressions', 'attributed_qs', 'minimum_qs']:
         if col not in channels:
             raise ValueError(f'data_channel.csv missing column: {col}')
-    channels = channels.rename(columns={'spend_local': 'spend', 'minimum_qs': 'last_click_qs'})
+    channels = channels.rename(columns={'spend_local': 'spend'})
     channels['date_day'] = pd.to_datetime(channels['date_day'], errors='raise').dt.normalize()
     for col in MARKET + ['channel']:
         channels[col] = channels[col].astype('string').str.strip().str.lower().replace('', pd.NA)
     for col in METRICS:
         channels[col] = pd.to_numeric(channels[col], errors='coerce')
-    if 'minimum_qs_source' in channels:
-        channels['minimum_qs_source'] = channels['minimum_qs_source'].astype('string').str.strip().str.lower()
+    if 'minimum_qs_source' not in channels:
+        raise ValueError('data_channel.csv missing minimum_qs_source')
+    channels['minimum_qs_source'] = channels['minimum_qs_source'].astype('string').str.strip().str.lower().replace({'-':pd.NA, '':pd.NA})
 
     if 'channel' not in constraints:
         raise ValueError('data_constraints.csv missing channel column')
@@ -47,6 +48,7 @@ def load_inputs(root: Path, settings: dict):
     constraints['enabled'] = constraints['enabled'].astype(str).str.lower().isin(['true', '1', 'yes', 'y'])
     constraints['constraint_period'] = constraints['constraint_period'].astype(str).str.lower().replace({'monthly': 'month'})
     constraints['minimum_source'] = constraints['minimum_source'].astype(str).str.lower().replace({'last_click_qs': 'minimum_qs'})
+    constraints['minimum_source_label'] = constraints['minimum_source']
     for col in ['minimum_multiplier', 'constraint_weight']:
         constraints[col] = pd.to_numeric(constraints[col], errors='raise')
 

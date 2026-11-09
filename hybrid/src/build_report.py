@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 TITLE = 'Marketing Efficiency Report - Blended CAC Model'
-COLS = [('channel','Channel','text'),('spend','Spend (local)','neutral'),('attributed_qs','Attributed QS','high'),('last_click_qs','Last-click QS','high'),('modelled_qs','Modelled QS','high'),('platform_cpqs','Platform CPQS','low'),('modelled_cpqs','Modelled CPQS','low'),('projected_op','Projected OP','high'),('projected_cohorted_cac','Projected CAC','low')]
+COLS = [('channel','Channel','text'),('spend','Spend (local)','neutral'),('attributed_qs','Attributed QS','high'),('minimum_qs','Minimum QS','high'),('minimum_qs_source','Minimum source','text'),('modelled_qs','Modelled QS','high'),('platform_cpqs','Platform CPQS','low'),('modelled_cpqs','Modelled CPQS','low'),('projected_op','Projected OP','high'),('projected_cohorted_cac','Projected CAC','low')]
 
 def fmt(v):
     return '—' if pd.isna(v) or not np.isfinite(float(v)) else f'{float(v):,.2f}'
@@ -26,18 +26,18 @@ def colour(v, series, direction):
 
 def table_for(sub):
     sub=sub.sort_values('modelled_qs',ascending=False)
-    sums={key:sub[key].sum(min_count=1) for key in ['spend','attributed_qs','last_click_qs','modelled_qs','projected_op']}
-    totals={'channel':'Total',**sums,'platform_cpqs':ratio(sums['spend'],sums['attributed_qs']),'modelled_cpqs':ratio(sums['spend'],sums['modelled_qs']),'projected_cohorted_cac':ratio(sums['spend'],sums['projected_op'])}
+    sums={key:sub[key].sum(min_count=1) for key in ['spend','attributed_qs','minimum_qs','modelled_qs','projected_op']}
+    totals={'channel':'Total','minimum_qs_source':'—',**sums,'platform_cpqs':ratio(sums['spend'],sums['attributed_qs']),'modelled_cpqs':ratio(sums['spend'],sums['modelled_qs']),'projected_cohorted_cac':ratio(sums['spend'],sums['projected_op'])}
     head=''.join(f'<th>{html.escape(label)}</th>' for _,label,_ in COLS)
     rows=[]
     for _,r in sub.iterrows():
         cells=[]
         for key,_,direction in COLS:
-            value=html.escape(str(r[key])) if key=='channel' else fmt(r[key])
-            style=colour(r[key],sub[key],direction) if key!='channel' else ''
+            value=html.escape(str(r[key])) if key in ('channel','minimum_qs_source') else fmt(r[key])
+            style=colour(r[key],sub[key],direction) if key not in ('channel','minimum_qs_source') else ''
             cells.append(f'<td style="{style}">{value}</td>')
         rows.append('<tr>'+''.join(cells)+'</tr>')
-    foot=''.join(f'<td>{html.escape(str(totals[key])) if key=="channel" else fmt(totals[key])}</td>' for key,_,_ in COLS)
+    foot=''.join(f'<td>{html.escape(str(totals[key])) if key in ('channel','minimum_qs_source') else fmt(totals[key])}</td>' for key,_,_ in COLS)
     return '<div class="scroll"><table><thead><tr>'+head+'</tr></thead><tbody>'+''.join(rows)+'</tbody><tfoot><tr>'+foot+'</tr></tfoot></table></div>'
 
 def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=None):

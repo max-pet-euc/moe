@@ -31,17 +31,20 @@ def validate(channels,constraints,targets,settings):
     if targets['actual_qs'].isna().any() or (targets['actual_qs']<0).any():
         errors.append('missing or negative actual QS in funnel')
     if not set(constraints['exposure_metric'].dropna()).issubset({'impressions','spend'}): errors.append('exposure_metric must be impressions or spend')
-    if not set(constraints['minimum_source'].dropna()).issubset({'minimum_qs','none'}): errors.append('minimum_source must be minimum_qs or none')
+    if not set(constraints['minimum_source'].dropna()).issubset({'minimum_qs','last-click','hdyhau','code','none'}): errors.append('minimum_source must be minimum_qs or none')
     if not set(constraints['constraint_type'].dropna()).issubset({'hard','none'}): errors.append('constraint_type must be hard or none')
     if (constraints['minimum_multiplier']<0).any(): errors.append('negative minimum_multiplier')
     if channels.empty or targets.empty:
         errors.append('no eligible channel/target daily data after mapping and coverage')
         return errors,warnings,pd.DataFrame(columns=MARKET+['period_start','floor','actual_qs'])
     c=channels.merge(constraints.loc[constraints['enabled'],['channel','minimum_source','minimum_multiplier','constraint_type']],on='channel',how='inner')
-    hard=c['constraint_type'].eq('hard') & c['minimum_source'].eq('minimum_qs')
-    missing=c['last_click_qs'].isna() & hard
+    hard=c['constraint_type'].eq('hard') & c['minimum_source'].ne('none')
+    missing=c['minimum_qs'].isna() & hard
     if missing.any(): errors.append(f'{int(missing.sum())} hard minimum_qs values missing; cannot treat missing as zero')
-    c['floor']=np.where(hard,c['last_click_qs'].fillna(0)*c['minimum_multiplier'],0.)
+    tolerance=float(settings.get('minimum_qs_tolerance',0.10))
+    c['floor']=np.where(hard,c['minimum_qs'].fillna(0)*c['minimum_multiplier']*(1-tolerance),0.)
+    mismatched=hard & c['minimum_qs_source'].fillna('').ne(c['minimum_source'].fillna(''))
+    if mismatched.any(): errors.append(f'{int(mismatched.sum())} minimum_qs_source values do not match data_constraints.csv')
     c['period_start']=period_start(c['date_day'],cf)
     t=targets.copy();t['period_start']=period_start(t['date_day'],cf)
     floors=c.groupby(MARKET+['period_start'],as_index=False)['floor'].sum()
