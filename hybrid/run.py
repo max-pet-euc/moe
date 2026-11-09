@@ -9,6 +9,7 @@ from .src.fit_model import fit_markets
 from .src.allocate_qs import allocate_periods,aggregate_reporting
 from .src.project_outcomes import project_outcomes
 from .src.build_report import build_report
+from .src.periods import frequency, period_start
 
 def main():
     root=Path(__file__).resolve().parent.parent
@@ -43,7 +44,14 @@ def main():
     allocation=aggregate_reporting(allocation_daily,settings)
     projections=project_outcomes(allocation,settings,root)
     projections.to_csv(out/'channel_report.csv',index=False)
-    build_report(projections,out/'report.html',settings,market_status=market_status)
+    actuals=valid_targets.copy()
+    actuals['period_start']=period_start(actuals['date_day'],frequency(settings,'reporting'))
+    actuals=actuals.groupby(['country_code','brand','period_start'],as_index=False).agg(
+        actual_qs=('actual_qs',lambda x:x.sum(min_count=1)),
+        actual_cp=('actual_cp',lambda x:x.sum(min_count=1)),
+        actual_op=('actual_op',lambda x:x.sum(min_count=1)))
+    actuals.to_csv(out/'actuals_by_period.csv',index=False)
+    build_report(projections,out/'report.html',settings,market_status=market_status,actuals=actuals)
     print('Hybrid run complete:',out/'report.html')
 
 if __name__=='__main__':main()

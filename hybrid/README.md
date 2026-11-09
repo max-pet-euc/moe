@@ -57,3 +57,6 @@ Markets with fewer than `minimum_training_days` target days are skipped rather t
 `outputs/market_status.csv` lists valid and invalid markets and the number of available days.
 The HTML report includes an **Invalid data** tab for each skipped market.
 Other markets continue to fit and allocate normally. Global validation errors still stop the run.
+
+## v1.8 Actuals row
+The report adds an Actuals row beneath Total for each period, with actual OP and blended CAC (channel spend / actual OP), sourced from data_funnel.csv. Actual QS, CP and OP appear in each period summary. Outputs include actuals_by_period.csv.
