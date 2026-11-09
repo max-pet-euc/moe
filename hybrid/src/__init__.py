@@ -1,0 +1,1 @@
+"""Independent MOE hybrid model."""
