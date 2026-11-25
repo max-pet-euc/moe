@@ -34,6 +34,9 @@ def load_inputs(root: Path, settings: dict):
         raise ValueError('data_channel.csv missing minimum_qs_source')
     channels['minimum_qs_source'] = channels['minimum_qs_source'].astype('string').str.strip().str.lower().replace({'-':pd.NA, '':pd.NA})
 
+    if 'attributed_source' not in constraints:
+        raise ValueError('data_constraints.csv missing attributed_source')
+    constraints['attributed_source'] = constraints['attributed_source'].astype('string').str.strip().str.lower()
     if 'channel' not in constraints:
         raise ValueError('data_constraints.csv missing channel column')
     constraints['channel'] = constraints['channel'].astype('string').str.strip().str.lower()
@@ -53,14 +56,14 @@ def load_inputs(root: Path, settings: dict):
         constraints[col] = pd.to_numeric(constraints[col], errors='raise')
 
     date_col, qs_col = settings['target_date_column'], settings['target_qs_column']
-    for col in [date_col, qs_col] + MARKET:
+    for col in [date_col, qs_col, 'op_projection'] + MARKET:
         if col not in targets:
             raise ValueError(f'data_funnel.csv missing column: {col}')
     targets = targets.rename(columns={date_col: 'date_day', qs_col: 'actual_qs'})
     targets['date_day'] = pd.to_datetime(targets['date_day'], errors='raise').dt.normalize()
     for col in MARKET:
         targets[col] = targets[col].astype('string').str.strip().str.lower()
-    for col in ['actual_qs', 'cp', 'op']:
+    for col in ['actual_qs', 'cp', 'op', 'op_projection']:
         if col not in targets:
             targets[col] = float('nan')
         targets[col] = pd.to_numeric(targets[col], errors='coerce')
@@ -71,5 +74,6 @@ def load_inputs(root: Path, settings: dict):
     targets = targets.groupby(KEYS, as_index=False).agg(
         actual_qs=('actual_qs', lambda x: x.sum(min_count=1)),
         actual_cp=('cp', lambda x: x.sum(min_count=1)),
-        actual_op=('op', lambda x: x.sum(min_count=1)))
+        actual_op=('op', lambda x: x.sum(min_count=1)),
+        actual_op_projection=('op_projection', lambda x: x.sum(min_count=len(x))))
     return channels, constraints, targets

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 TITLE = 'Marketing Efficiency Report - Blended CAC Model'
-COLS = [('channel','Channel','text'),('spend','Spend (local)','neutral'),('attributed_qs','Attributed QS','high'),('minimum_qs','Minimum QS','high'),('minimum_qs_source','Minimum source','text'),('modelled_qs','Modelled QS','high'),('platform_cpqs','Platform CPQS','low'),('modelled_cpqs','Modelled CPQS','low'),('projected_op','Projected OP','high'),('projected_cohorted_cac','Projected CAC','low')]
+COLS = [('channel','Channel','text'),('spend','Spend (local)','neutral'),('attributed_qs','Attributed QS','high'),('attributed_source','Attributed source','text'),('modelled_qs','Modelled QS','high'),('platform_cpqs','Attributed CPQS','low'),('modelled_cpqs','Modelled CPQS','low'),('projected_op','Projected OP','high'),('projected_cohorted_cac','Projected CAC','low')]
 
 def fmt(v):
     return '—' if pd.isna(v) or not np.isfinite(float(v)) else f'{float(v):,.2f}'
@@ -27,29 +27,28 @@ def colour(v, series, direction):
 def table_for(sub, actual=None):
     sub=sub.sort_values('modelled_qs',ascending=False)
     sums={key:sub[key].sum(min_count=1) for key in ['spend','attributed_qs','minimum_qs','modelled_qs','projected_op']}
-    totals={'channel':'Total','minimum_qs_source':'—',**sums,'platform_cpqs':ratio(sums['spend'],sums['attributed_qs']),'modelled_cpqs':ratio(sums['spend'],sums['modelled_qs']),'projected_cohorted_cac':ratio(sums['spend'],sums['projected_op'])}
+    totals={'channel':'Total','attributed_source':'—',**sums,'platform_cpqs':ratio(sums['spend'],sums['attributed_qs']),'modelled_cpqs':ratio(sums['spend'],sums['modelled_qs']),'projected_cohorted_cac':ratio(sums['spend'],sums['projected_op'])}
     head=''.join(f'<th>{html.escape(label)}</th>' for _,label,_ in COLS)
     rows=[]
     for _,r in sub.iterrows():
         cells=[]
         for key,_,direction in COLS:
-            value=html.escape(str(r[key])) if key in ('channel','minimum_qs_source') else fmt(r[key])
-            style=colour(r[key],sub[key],direction) if key not in ('channel','minimum_qs_source') else ''
+            value=html.escape(str(r[key])) if key in ('channel','attributed_source') else fmt(r[key])
+            style=colour(r[key],sub[key],direction) if key not in ('channel','attributed_source') else ''
             cells.append(f'<td style="{style}">{value}</td>')
         rows.append('<tr>'+''.join(cells)+'</tr>')
-    foot=''.join(f'<td>{html.escape(str(totals[key])) if key in ('channel','minimum_qs_source') else fmt(totals[key])}</td>' for key,_,_ in COLS)
-    actual_cells=[]
+    foot=''.join(f'<td>{html.escape(str(totals[key])) if key in ('channel','attributed_source') else fmt(totals[key])}</td>' for key,_,_ in COLS)
+    actual_html=''
     if actual is not None:
-        actual_op=actual.get('actual_op',np.nan)
-        actual_cac=ratio(sums['spend'],actual_op)
-        # Keep modelled-QS and attributed-QS fields blank: actuals are market-wide,
-        # not channel-attributed and should not be labelled as model estimates.
-        actual_row={'channel':'Actuals','spend':sums['spend'],
-                    'attributed_qs':np.nan,'minimum_qs':np.nan,'minimum_qs_source':'—',
-                    'modelled_qs':np.nan,'platform_cpqs':np.nan,'modelled_cpqs':np.nan,
-                    'projected_op':actual_op,'projected_cohorted_cac':actual_cac}
-        actual_cells=[f'<td>{html.escape(str(actual_row[key])) if key in ("channel","minimum_qs_source") else fmt(actual_row[key])}</td>' for key,_,_ in COLS]
-    actual_html='<tr class="actuals">'+''.join(actual_cells)+'</tr>' if actual_cells else ''
+        for label,op_key,css_class in [('Actuals (projected cohort)','actual_op_projection','actuals'),('Actuals (uncohorted)','actual_op','reference')]:
+            actual_op=actual.get(op_key,np.nan)
+            actual_row={'channel':label,'spend':sums['spend'],
+                        'attributed_qs':np.nan,'attributed_source':'—',
+                        'modelled_qs':actual.get('actual_qs',np.nan),'platform_cpqs':np.nan,
+                        'modelled_cpqs':ratio(sums['spend'],actual.get('actual_qs',np.nan)),
+                        'projected_op':actual_op,'projected_cohorted_cac':ratio(sums['spend'],actual_op)}
+            cells=[f'<td>{html.escape(str(actual_row[key])) if direction=="text" else fmt(actual_row[key])}</td>' for key,_,direction in COLS]
+            actual_html+=f'<tr class="{css_class}">'+''.join(cells)+'</tr>'
     return '<div class="scroll"><table><thead><tr>'+head+'</tr></thead><tbody>'+''.join(rows)+'</tbody><tfoot><tr>'+foot+'</tr>'+actual_html+'</tfoot></table></div>'
 
 def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=None,actuals=None):
@@ -67,8 +66,8 @@ def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=N
                     if not matching.empty: actual=matching.iloc[0]
                 summary=f"Actual QS: {fmt(sub['actual_qs'].iloc[0])} · Modelled channel QS: {fmt(sub['modelled_qs'].sum())} · Baseline QS: {fmt(sub['baseline_qs'].iloc[0])}"
                 if actual is not None:
-                    summary += f" · Actual CP: {fmt(actual['actual_cp'])} · Actual OP: {fmt(actual['actual_op'])}"
-                note='<p class="note">Total = projected OP and projected CAC. Actuals = actual OP and actual blended CAC (total channel spend ÷ actual OP). Actuals are not channel-attributed.</p>'
+                    summary += f" · Actual CP: {fmt(actual['actual_cp'])} · Projected cohort OP: {fmt(actual['actual_op_projection'])} · Uncohorted OP: {fmt(actual['actual_op'])}"
+                note='<p class="note">Total = modelled channel projections. Actuals (projected cohort) uses funnel op_projection; uncohorted uses funnel op. Actuals rows show actual market QS and spend ÷ actual QS in the modelled columns for comparison. CAC uses included channel spend ÷ respective OP. Actuals are not channel-attributed. Missing cohort projections are not treated as zero.</p>'
                 sections.append(f'<section><h2>{html.escape(str(pd.Timestamp(period).date()))}</h2><p>{summary}</p>{table_for(sub,actual)}{note}</section>')
             tabs.append((f'{country.upper()} · {brand}',''.join(sections)))
     if market_status is not None and not market_status.empty:
@@ -79,7 +78,7 @@ def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=N
     if not tabs: tabs.append(('No eligible markets','<section><h2>No eligible markets</h2><p>Check market_status.csv and validation_report.csv.</p></section>'))
     buttons=''.join(f'<button type="button" class="market-tab" id="tab{i}" role="tab" aria-selected="false" onclick="show({i})">{html.escape(label)}</button>' for i,(label,_) in enumerate(tabs))
     panels=''.join(f'<div class="panel" id="panel{i}">{content}</div>' for i,(_,content) in enumerate(tabs))
-    css='body{font:15px system-ui,Arial;margin:32px;background:#f7f8fa;color:#182333}h1{margin-bottom:4px}p{color:#526073}button{border:1px solid #ccd3dd;border-radius:8px;background:white;color:#34445a;padding:10px 15px;margin:4px;cursor:pointer;font-weight:550;transition:background .15s,border-color .15s}button:hover{background:#edf2f8}button.active{background:#183a68;color:white;border-color:#183a68;box-shadow:0 2px 7px rgba(24,58,104,.22);font-weight:750}button.active:hover{background:#234e85}button:focus-visible{outline:3px solid #80b7ff;outline-offset:2px}.panel{display:none}section{background:white;border:1px solid #e0e4ea;border-radius:12px;padding:18px;margin:18px 0}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap;font-variant-numeric:tabular-nums}th,td{text-align:right;padding:11px;border-bottom:1px solid #e6e9ed}th:first-child,td:first-child{text-align:left}th{background:#f2f4f7}tfoot td{background:#e8edf5;font-weight:750;border-top:2px solid #9aaac1;border-bottom:0}tfoot tr.actuals td{background:#e2f2e9;border-top:1px solid #a4cdb6}.note{font-size:12px;color:#637183}'
+    css='body{font:15px system-ui,Arial;margin:32px;background:#f7f8fa;color:#182333}h1{margin-bottom:4px}p{color:#526073}button{border:1px solid #ccd3dd;border-radius:8px;background:white;color:#34445a;padding:10px 15px;margin:4px;cursor:pointer;font-weight:550;transition:background .15s,border-color .15s}button:hover{background:#edf2f8}button.active{background:#183a68;color:white;border-color:#183a68;box-shadow:0 2px 7px rgba(24,58,104,.22);font-weight:750}button.active:hover{background:#234e85}button:focus-visible{outline:3px solid #80b7ff;outline-offset:2px}.panel{display:none}section{background:white;border:1px solid #e0e4ea;border-radius:12px;padding:18px;margin:18px 0}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap;font-variant-numeric:tabular-nums}th,td{text-align:right;padding:11px;border-bottom:1px solid #e6e9ed}th:first-child,td:first-child{text-align:left}th{background:#f2f4f7}tfoot td{background:#e8edf5;font-weight:750;border-top:2px solid #9aaac1;border-bottom:0}tfoot tr.actuals td{background:#e2f2e9;border-top:1px solid #a4cdb6}tfoot tr.reference td{background:#f4f5f7;color:#637183;font-weight:500;border-top:1px solid #dce1e7}.note{font-size:12px;color:#637183}'
     doc='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+html.escape(TITLE)+'</title><style>'+css+'</style></head><body><h1>'+html.escape(TITLE)+'</h1>'+f'<p>{html.escape(str(freq).title())} reporting · latest 3 periods · {tolerance:.0%} minimum-QS tolerance · constrained allocation, not causal incrementality.</p><nav>'+buttons+'</nav>'+panels+'<script>function show(i){document.querySelectorAll(".panel").forEach((e,j)=>e.style.display=i===j?"block":"none");document.querySelectorAll(".market-tab").forEach((e,j)=>{e.classList.toggle("active",i===j);e.setAttribute("aria-selected",String(i===j))})}show(0)</script></body></html>'
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(doc,encoding='utf-8')
