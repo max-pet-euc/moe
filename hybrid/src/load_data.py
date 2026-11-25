@@ -63,7 +63,7 @@ def load_inputs(root: Path, settings: dict):
     targets['date_day'] = pd.to_datetime(targets['date_day'], errors='raise').dt.normalize()
     for col in MARKET:
         targets[col] = targets[col].astype('string').str.strip().str.lower()
-    for col in ['actual_qs', 'cp', 'op', 'op_projection']:
+    for col in ['actual_qs', 'cp', 'op', 'op_projection', 'cp_projection']:
         if col not in targets:
             targets[col] = float('nan')
         targets[col] = pd.to_numeric(targets[col], errors='coerce')
@@ -75,5 +75,6 @@ def load_inputs(root: Path, settings: dict):
         actual_qs=('actual_qs', lambda x: x.sum(min_count=1)),
         actual_cp=('cp', lambda x: x.sum(min_count=1)),
         actual_op=('op', lambda x: x.sum(min_count=1)),
-        actual_op_projection=('op_projection', lambda x: x.sum(min_count=len(x))))
+        actual_op_projection=('op_projection', lambda x: x.sum(min_count=len(x))),
+        actual_cp_projection=('cp_projection', lambda x: x.sum(min_count=len(x))))
     return channels, constraints, targets

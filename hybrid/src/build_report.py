@@ -67,7 +67,11 @@ def build_report(allocation:pd.DataFrame,path:Path,settings=None,market_status=N
                 summary=f"Actual QS: {fmt(sub['actual_qs'].iloc[0])} · Modelled channel QS: {fmt(sub['modelled_qs'].sum())} · Baseline QS: {fmt(sub['baseline_qs'].iloc[0])}"
                 if actual is not None:
                     summary += f" · Actual CP: {fmt(actual['actual_cp'])} · Projected cohort OP: {fmt(actual['actual_op_projection'])} · Uncohorted OP: {fmt(actual['actual_op'])}"
-                note='<p class="note">Total = modelled channel projections. Actuals (projected cohort) uses funnel op_projection; uncohorted uses funnel op. Actuals rows show actual market QS and spend ÷ actual QS in the modelled columns for comparison. CAC uses included channel spend ÷ respective OP. Actuals are not channel-attributed. Missing cohort projections are not treated as zero.</p>'
+                r=sub.iloc[0]
+                def pct(v):
+                    return '—' if pd.isna(v) else f'{v:.2%}'
+                summary += f" · QS → CP: {pct(r['qs_to_cp'])} · CP → OP: {pct(r['cp_to_op'])} · QS → OP: {pct(r['qs_to_op'])} · Rate source: {html.escape(str(r['conversion_rate_used']))}"
+                note='<p class="note">Total = modelled channel projections. Actuals (projected cohort) uses funnel op_projection; uncohorted uses funnel op. Actuals rows show actual market QS and spend ÷ actual QS in the modelled columns for comparison. CAC uses included channel spend ÷ respective OP. Actuals are not channel-attributed. Missing cohort projections are not treated as zero. Cohort rates are shared across channels; without cp_projection only QS → OP is observed. Modelled CAC is not an independent validation of cohort CAC.</p>'
                 sections.append(f'<section><h2>{html.escape(str(pd.Timestamp(period).date()))}</h2><p>{summary}</p>{table_for(sub,actual)}{note}</section>')
             tabs.append((f'{country.upper()} · {brand}',''.join(sections)))
     if market_status is not None and not market_status.empty:
