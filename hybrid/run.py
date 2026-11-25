@@ -42,18 +42,19 @@ def main():
     allocation_daily=allocate_periods(valid_channels,constraints,valid_targets,daily_fit,settings)
     allocation_daily.to_csv(out/'channel_daily_modelled.csv',index=False)
     allocation=aggregate_reporting(allocation_daily,settings)
-    projections=project_outcomes(allocation,settings,root)
-    if not projections.empty:
-        projections=projections.merge(constraints[['channel','attributed_source']],on='channel',how='left',validate='many_to_one')
-    projections.to_csv(out/'channel_report.csv',index=False)
     actuals=valid_targets.copy()
     actuals['period_start']=period_start(actuals['date_day'],frequency(settings,'reporting'))
     actuals=actuals.groupby(['country_code','brand','period_start'],as_index=False).agg(
         actual_qs=('actual_qs',lambda x:x.sum(min_count=1)),
         actual_cp=('actual_cp',lambda x:x.sum(min_count=1)),
         actual_op=('actual_op',lambda x:x.sum(min_count=1)),
-        actual_op_projection=('actual_op_projection',lambda x:x.sum(min_count=len(x))))
+        actual_op_projection=('actual_op_projection',lambda x:x.sum(min_count=len(x))),
+        actual_cp_projection=('actual_cp_projection',lambda x:x.sum(min_count=len(x))))
     actuals.to_csv(out/'actuals_by_period.csv',index=False)
+    projections=project_outcomes(allocation,settings,root,actuals=actuals)
+    if not projections.empty:
+        projections=projections.merge(constraints[['channel','attributed_source']],on='channel',how='left',validate='many_to_one')
+    projections.to_csv(out/'channel_report.csv',index=False)
     build_report(projections,out/'report.html',settings,market_status=market_status,actuals=actuals)
     print('Hybrid run complete:',out/'report.html')
 

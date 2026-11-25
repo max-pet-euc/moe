@@ -60,3 +60,6 @@ Other markets continue to fit and allocate normally. Global validation errors st
 
 ## v1.8 Actuals row
 The report adds an Actuals row beneath Total for each period, with actual OP and blended CAC (channel spend / actual OP), sourced from data_funnel.csv. Actual QS, CP and OP appear in each period summary. Outputs include actuals_by_period.csv.
+
+## Cohort conversion rates (v1.11)
+Default conversion_rate_source is projected_cohort: sum(op_projection) / sum(qs) by market and reporting period. Optional cp_projection enables separate QS-to-CP and CP-to-OP rates; otherwise these are unavailable. Missing or invalid cohort OP uses configured fallback assumptions. Set conversion_rate_source to fixed to use configured assumptions. Shared rates do not independently validate CAC.
