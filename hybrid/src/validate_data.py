@@ -34,10 +34,15 @@ def validate(channels,constraints,targets,settings):
     if not set(constraints['minimum_source'].dropna()).issubset({'minimum_qs','last-click','hdyhau','code','none'}): errors.append('minimum_source must be minimum_qs or none')
     if not set(constraints['constraint_type'].dropna()).issubset({'hard','none'}): errors.append('constraint_type must be hard or none')
     if (constraints['minimum_multiplier']<0).any(): errors.append('negative minimum_multiplier')
+    active=constraints['maximum_source'].notna()
+    mult=constraints['maximum_multiplier']
+    if not constraints.loc[active,'maximum_source'].isin(['attributed_qs']).all(): errors.append('maximum_source must be attributed_qs or blank')
+    if (active & (mult.isna() | ~np.isfinite(mult) | (mult<0))).any(): errors.append('active maximum requires finite nonnegative maximum_multiplier')
+    if (~active & mult.notna()).any(): errors.append('maximum_multiplier requires maximum_source')
     if channels.empty or targets.empty:
         errors.append('no eligible channel/target daily data after mapping and coverage')
         return errors,warnings,pd.DataFrame(columns=MARKET+['period_start','floor','actual_qs'])
-    c=channels.merge(constraints.loc[constraints['enabled'],['channel','minimum_source','minimum_multiplier','constraint_type']],on='channel',how='inner')
+    c=channels.merge(constraints.loc[constraints['enabled'],['channel','minimum_source','minimum_multiplier','constraint_type','maximum_source','maximum_multiplier']],on='channel',how='inner')
     hard=c['constraint_type'].eq('hard') & c['minimum_source'].ne('none')
     missing=c['minimum_qs'].isna() & hard
     if missing.any(): errors.append(f'{int(missing.sum())} hard minimum_qs values missing; cannot treat missing as zero')
@@ -46,6 +51,13 @@ def validate(channels,constraints,targets,settings):
     mismatched=hard & c['minimum_qs_source'].fillna('').ne(c['minimum_source'].fillna(''))
     if mismatched.any(): errors.append(f'{int(mismatched.sum())} minimum_qs_source values do not match data_constraints.csv')
     c['period_start']=period_start(c['date_day'],cf)
+    capped=c['maximum_source'].eq('attributed_qs').fillna(False)
+    if (capped & (c['attributed_qs'].isna() | ~np.isfinite(c['attributed_qs']))).any(): errors.append('missing or invalid attributed_qs for capped channel')
+    c['cap']=np.where(capped,c['attributed_qs']*c['maximum_multiplier'],np.inf)
+    bounds=c.groupby(MARKET+['period_start','channel'],as_index=False).agg(floor=('floor','sum'),cap=('cap',lambda x:x.to_numpy(float).sum()))
+    conflict=bounds.loc[bounds['floor']>bounds['cap']+1e-6]
+    for row in conflict.to_dict("records"):
+        warnings.append(f"Maximum QS raised to adjusted minimum: {row}; effective_maximum={row['floor']}")
     t=targets.copy();t['period_start']=period_start(t['date_day'],cf)
     floors=c.groupby(MARKET+['period_start'],as_index=False)['floor'].sum()
     actual=t.groupby(MARKET+['period_start'],as_index=False)['actual_qs'].sum()

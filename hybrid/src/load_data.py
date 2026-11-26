@@ -55,6 +55,11 @@ def load_inputs(root: Path, settings: dict):
     for col in ['minimum_multiplier', 'constraint_weight']:
         constraints[col] = pd.to_numeric(constraints[col], errors='raise')
 
+    for col in ['maximum_source','maximum_multiplier']:
+        if col not in constraints: constraints[col] = pd.NA
+    constraints['maximum_source'] = constraints['maximum_source'].astype('string').str.strip().str.lower().replace({'none':pd.NA,'':pd.NA})
+    constraints['maximum_multiplier'] = pd.to_numeric(constraints['maximum_multiplier'], errors='raise')
+
     date_col, qs_col = settings['target_date_column'], settings['target_qs_column']
     for col in [date_col, qs_col, 'op_projection'] + MARKET:
         if col not in targets:

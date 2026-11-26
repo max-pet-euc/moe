@@ -7,10 +7,10 @@ from .load_data import MARKET, KEYS
 
 def _sum_nullable(x): return x.sum(min_count=1)
 
-def _weighted_projection(desired, lower, weights, total):
-    """Exact weighted least-squares projection onto a simplex with lower bounds.
+def _weighted_projection(desired, lower, weights, total, upper=None):
+    """Exact weighted least-squares projection onto a simplex with lower and upper bounds.
 
-    Minimises sum(weights * (x - desired)^2), with x >= lower and sum(x)=total.
+    Minimises sum(weights * (x - desired)^2), with lower <= x <= upper and sum(x)=total.
     Bisection on the KKT multiplier avoids fragile SLSQP line searches.
     """
     desired=np.asarray(desired,dtype=float)
@@ -20,13 +20,17 @@ def _weighted_projection(desired, lower, weights, total):
         raise ValueError('non-finite inputs to QS allocation')
     if (weights<=0).any() or (lower<0).any() or total<0:
         raise ValueError('invalid allocation weights, floors or total')
+    upper=np.full_like(lower,np.inf) if upper is None else np.asarray(upper,dtype=float)
+    if np.isnan(upper).any() or (upper<lower-1e-8).any() or upper.sum()<total-1e-6:
+        raise ValueError('infeasible maximum QS bounds')
+    upper=np.maximum(upper,lower)
     if lower.sum()>total+1e-6:
         raise ValueError(f'infeasible hard floors: {lower.sum()} > {total}')
     if total-lower.sum()<=1e-9:
         return lower.copy()
     # x_i = max(lower_i, desired_i - lambda/(2*weight_i))
     def at(lam):
-        return np.maximum(lower,desired-lam/(2*weights))
+        return np.clip(desired-lam/(2*weights),lower,upper)
     lo=-1.0
     hi=1.0
     for _ in range(200):
@@ -43,12 +47,12 @@ def _weighted_projection(desired, lower, weights, total):
     # Correct floating point residual without breaching floors.
     residual=total-x.sum()
     if residual>0:
-        x[np.argmax(weights)]+=residual
+        x[np.argmax(upper-x)]+=residual
     elif residual<0:
         slack=x-lower
         idx=np.argmax(slack)
         if slack[idx]>=-residual-1e-7:x[idx]+=residual
-    if abs(x.sum()-total)>1e-5 or (x<lower-1e-5).any():
+    if abs(x.sum()-total)>1e-5 or (x<lower-1e-5).any() or (x>upper+1e-5).any():
         raise RuntimeError('numerical reconciliation failed in weighted projection')
     return x
 
@@ -88,13 +92,14 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
     enforced over the configured constraint period. No causal interpretation.
     """
     cf=frequency(settings,'constraints')
-    ch=channels.merge(constraints[['channel','enabled','minimum_source','minimum_multiplier','constraint_type']],on='channel',how='inner')
+    ch=channels.merge(constraints[['channel','enabled','minimum_source','minimum_multiplier','constraint_type','maximum_source','maximum_multiplier']],on='channel',how='inner')
     ch=ch.loc[ch['enabled']].copy()
     ch['period_start']=period_start(ch['date_day'],cf)
     hard=ch['constraint_type'].eq('hard') & ch['minimum_source'].ne('none')
     tolerance=float(settings.get('minimum_qs_tolerance',0.10))
     if not 0 <= tolerance < 1: raise ValueError('minimum_qs_tolerance must be in [0,1)')
     ch['floor']=np.where(hard,ch['minimum_qs'].fillna(0)*ch['minimum_multiplier']*(1-tolerance),0.)
+    ch['cap']=np.where(ch['maximum_source'].eq('attributed_qs').fillna(False),ch['attributed_qs']*ch['maximum_multiplier'],np.inf)
     t=targets.copy();t['period_start']=period_start(t['date_day'],cf)
     f=fit_daily.copy()
     # Raw model signal by channel/day: sum both exposure and attribution components.
@@ -120,6 +125,8 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
         names=sorted(sub['channel'].unique())
         n=len(names); d=len(days)
         floor=sub.groupby('channel')['floor'].sum().reindex(names,fill_value=0).to_numpy(float)
+        cap=sub.groupby('channel')['cap'].agg(lambda x: x.to_numpy(float).sum()).reindex(names).to_numpy(float)
+        cap=np.maximum(cap,floor)
         total=float(actual['actual_qs'].sum())
         if floor.sum()>total+1e-6: raise ValueError(f'infeasible hard floors for {market_period}: {floor.sum()} > {total}')
         # Daily prior from fitted model. Allocate a modest baseline prior.
@@ -136,19 +143,18 @@ def allocate_periods(channels,constraints,targets,fit_daily,settings):
         desired_totals=desired.sum(axis=0)
         lower=np.r_[floor,0.]
         weights=np.r_[np.ones(n)*float(settings.get('channel_signal_weight',1)),float(settings.get('baseline_weight',0.5))]
-        col_target=_weighted_projection(desired_totals,lower,weights,total)
+        col_target=_weighted_projection(desired_totals,lower,weights,total,np.r_[cap,np.inf])
         matrix=_daily_transport(desired,actual_vec,col_target)
         if np.max(np.abs(matrix.sum(axis=0)-col_target))>1e-3 or np.max(np.abs(matrix.sum(axis=1)-actual_vec))>1e-3:
             raise RuntimeError(f'daily reconciliation tolerance exceeded for {market_period}')
         lookup=sub.set_index(['date_day','channel'])
         for j,day in enumerate(days):
             for i,name in enumerate(names):
-                if (day,name) not in lookup.index: continue
-                row=lookup.loc[(day,name)]
+                row=lookup.loc[(day,name)] if (day,name) in lookup.index else {'spend':np.nan,'attributed_qs':np.nan,'minimum_qs':np.nan,'minimum_qs_source':pd.NA,'floor':0.,'cap':0. if np.isfinite(cap[i]) else np.inf,'raw_signal':0.}
                 if isinstance(row,pd.DataFrame): row=row.iloc[0]
                 records.append({'date_day':day,'country_code':country,'brand':brand,'constraint_period_start':start,
                     'channel':name,'spend':row['spend'],'attributed_qs':row['attributed_qs'],
-                    'minimum_qs':row['minimum_qs'],'minimum_qs_source':row['minimum_qs_source'],'floor':row['floor'],
+                    'minimum_qs':row['minimum_qs'],'minimum_qs_source':row['minimum_qs_source'],'floor':row['floor'],'cap':row['cap'],
                     'modelled_qs':float(matrix[j,i]),'actual_qs':float(actual_vec[j]),
                     'baseline_qs':float(matrix[j,-1]),'raw_model_signal':float(row['raw_signal'])})
     out=pd.DataFrame(records)
